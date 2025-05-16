@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { SignedIn } from '@clerk/nextjs';
 import { AuthButtons } from "@/components/auth/auth-buttons";
 
 export function Header() {
@@ -15,11 +14,6 @@ export function Header() {
           <Link href="/" className="text-sm font-medium text-muted-foreground hover:text-foreground">
             Home
           </Link>
-          <SignedIn>
-            <Link href="/dashboard" className="text-sm font-medium text-muted-foreground hover:text-foreground">
-              Dashboard
-            </Link>
-          </SignedIn>
           <AuthButtons />
         </nav>
       </div>
