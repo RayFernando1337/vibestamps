@@ -2,6 +2,8 @@ import GhibliBackground from "@/components/ui/ghibli-background";
 import type { Metadata } from "next";
 import { ThemeProvider } from "next-themes";
 import { Doto, Geist, Geist_Mono } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
+import { Header } from "@/components/layout/header";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -32,13 +34,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} ${doto.variable} antialiased`}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <GhibliBackground />
-          {children}
-        </ThemeProvider>
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en" suppressHydrationWarning>
+        <body className={`${geistSans.variable} ${geistMono.variable} ${doto.variable} antialiased`}>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+            <GhibliBackground />
+            <Header />
+            <main className="container py-4">
+              {children}
+            </main>
+          </ThemeProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
