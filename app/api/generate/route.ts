@@ -3,6 +3,7 @@ import { generateApiRequestSchema } from "@/lib/schemas";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { streamText, wrapLanguageModel, type LanguageModelV1Middleware } from "ai";
 import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 
 // Initialize the Google Generative AI provider
 const googleBase = createGoogleGenerativeAI({
@@ -52,6 +53,12 @@ const modelWithFallback = wrapLanguageModel({
 
 export async function POST(request: Request) {
   try {
+    // Check if user is authenticated
+    const { userId } = await auth();
+    if (!userId) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+
     // Check request size before parsing
     const contentLength = request.headers.get("content-length");
     if (contentLength && parseInt(contentLength) > MAX_FILE_SIZE) {
