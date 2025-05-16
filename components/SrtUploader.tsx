@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { MAX_FILE_SIZE } from "@/lib/constants";
 import { srtFileSchema } from "@/lib/schemas";
 import { extractTextFromSrt, parseSrtContent, SrtEntry } from "@/lib/srt-parser";
+import { SignInButton, useAuth } from "@clerk/nextjs";
 import { useRef, useState } from "react";
 
 interface SrtUploaderProps {
@@ -21,12 +22,14 @@ export function SrtUploader({
   entriesCount,
   hasContent,
 }: SrtUploaderProps) {
+  const { isSignedIn } = useAuth();
   const [fileName, setFileName] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isSignedIn) return;
     const file = event.target.files?.[0];
     if (file) processFile(file);
   };
@@ -100,14 +103,102 @@ export function SrtUploader({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-
+    
+    if (!isSignedIn) return;
+    
     const file = e.dataTransfer.files?.[0];
     if (file) processFile(file);
   };
 
   const triggerFileInput = () => {
+    if (!isSignedIn) return;
     fileInputRef.current?.click();
   };
+
+  // Render the uploader interface for authenticated users
+  const renderUploader = () => (
+    <>
+      <div className="text-center mb-2">
+        <h2 className="text-xl font-semibold mb-3 text-emerald-800 dark:text-emerald-300">
+          {!hasContent ? 'Upload SRT File' : 'Process Another File'}
+        </h2>
+        <p className="text-sky-700/70 dark:text-sky-300/70 text-sm">
+          {!hasContent 
+            ? 'Drag & drop your .srt file here or click to browse'
+            : 'Upload a different file to process'}
+        </p>
+      </div>
+
+      <Input
+        ref={fileInputRef}
+        type="file"
+        accept=".srt"
+        onChange={handleFileChange}
+        className="hidden"
+        disabled={disabled}
+      />
+
+      <Button
+        onClick={triggerFileInput}
+        className="w-full max-w-xs"
+        disabled={disabled}
+        size="lg"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="mr-1"
+        >
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
+        </svg>
+        {!hasContent ? 'Select SRT File' : 'Choose Another File'}
+      </Button>
+    </>
+  );
+
+  // Render the sign up prompt for unauthenticated users
+  const renderSignUpPrompt = () => (
+    <div className="text-center">
+      <h2 className="text-2xl font-bold mb-3 text-emerald-700 dark:text-emerald-300">
+        Create Timestamps in Seconds
+      </h2>
+      <p className="text-sky-700/80 dark:text-sky-300/80 text-sm mb-6">
+        Sign up to start creating timestamps for your videos instantly
+      </p>
+      
+      <div className="space-y-3">
+        <SignInButton mode="modal">
+          <Button className="w-full max-w-xs" size="lg">
+            Create Free Account
+          </Button>
+        </SignInButton>
+        
+        <div className="text-xs text-slate-500 dark:text-slate-400 pt-2">
+          Already have an account?{' '}
+          <SignInButton mode="modal">
+            <button className="text-sky-600 dark:text-sky-400 hover:underline font-medium">
+              Sign In
+            </button>
+          </SignInButton>
+        </div>
+        
+        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            No credit card required
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <Card
@@ -121,52 +212,7 @@ export function SrtUploader({
       onDrop={handleDrop}
     >
       <CardContent className="flex flex-col items-center gap-5 p-6">
-        {!hasContent && (
-          <>
-            <div className="text-center mb-2">
-              <h2 className="text-xl font-semibold mb-3 text-emerald-800 dark:text-emerald-300">
-                Upload SRT File
-              </h2>
-              <p className="text-sky-700/70 dark:text-sky-300/70 text-sm">
-                Drag & drop your .srt file here or click to browse
-              </p>
-            </div>
-
-            <Input
-              ref={fileInputRef}
-              type="file"
-              accept=".srt"
-              onChange={handleFileChange}
-              className="hidden"
-              disabled={disabled}
-            />
-
-            <Button
-              onClick={triggerFileInput}
-              className="w-full max-w-xs"
-              disabled={disabled}
-              size="lg"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="mr-1"
-              >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="17 8 12 3 7 8" />
-                <line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-              Select SRT File
-            </Button>
-          </>
-        )}
+        {!isSignedIn ? renderSignUpPrompt() : !hasContent ? renderUploader() : null}
 
         {fileName && (
           <div className="mt-2 text-sm flex items-center justify-center gap-2 bg-emerald-50/80 dark:bg-emerald-900/20 p-3 rounded-xl w-full backdrop-blur-sm border border-emerald-100 dark:border-emerald-800/50">
