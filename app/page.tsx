@@ -9,99 +9,103 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { srtContentSchema, srtEntriesSchema } from "@/lib/schemas";
+import {
+  srtContentSchema,
+  srtEntriesSchema,
+  AIGeneratedTimestampsOutputSchema,
+  type AITimestampEntrySchema as AITimestampEntry, // Renaming for clarity if used as type
+} from "@/lib/schemas";
 import { SrtEntry } from "@/lib/srt-parser";
+import { useCompletion } from "ai/react";
 import { Doto } from "next/font/google";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { z } from "zod";
 
 const doto = Doto({ weight: "900", subsets: ["latin"] });
 
 export default function Home() {
   const [srtContent, setSrtContent] = useState<string>("");
   const [srtEntries, setSrtEntries] = useState<SrtEntry[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [generatedContent, setGeneratedContent] = useState<string>("");
-  const [error, setError] = useState<string>("");
+  const [generatedTimestamps, setGeneratedTimestamps] = useState<AITimestampEntry[]>([]);
+  const [clientError, setClientError] = useState<string>(""); // For errors not from useCompletion
+
   const [isProMode, setIsProMode] = useState(false);
   const [numTimestamps, setNumTimestamps] = useState(10);
 
+  const {
+    completion,
+    complete,
+    isLoading,
+    error: completionError,
+    setCompletion, // To reset completion data
+  } = useCompletion({
+    api: "/api/generate",
+    onFinish: (_prompt, result) => {
+      try {
+        const parsedData = AIGeneratedTimestampsOutputSchema.parse(JSON.parse(result));
+        setGeneratedTimestamps(parsedData.timestamps);
+        setClientError(""); // Clear any previous client-side errors
+      } catch (e) {
+        console.error("Error parsing AI response:", e);
+        if (e instanceof z.ZodError) {
+          setClientError(`AI returned invalid data: ${e.errors.map((err) => err.message).join(", ")}`);
+        } else if (e instanceof SyntaxError) {
+          setClientError("AI returned malformed JSON.");
+        } else {
+          setClientError("Failed to process AI response.");
+        }
+        setGeneratedTimestamps([]); // Clear previous results on error
+      }
+    },
+    onError: (e) => {
+      // This error is from the API call itself (network, server error status)
+      setClientError(e.message || "Failed to generate timestamps from API.");
+      setGeneratedTimestamps([]); // Clear previous results on error
+    }
+  });
+
   // Handle extracted SRT content
   const handleContentExtracted = (content: string, entries: SrtEntry[]) => {
-    // Validate content and entries with Zod
     try {
-      // Validate SRT content
       const contentValidation = srtContentSchema.safeParse({ srtContent: content });
       if (!contentValidation.success) {
-        setError(contentValidation.error.errors[0].message);
+        setClientError(contentValidation.error.errors[0].message);
         return;
       }
-
-      // Validate SRT entries
       const entriesValidation = srtEntriesSchema.safeParse(entries);
       if (!entriesValidation.success) {
-        setError("Invalid SRT entries format");
+        setClientError("Invalid SRT entries format");
         return;
       }
-
       setSrtContent(content);
       setSrtEntries(entries);
-      setGeneratedContent(""); // Reset previous results
-      setError("");
+      setGeneratedTimestamps([]); // Reset previous results
+      setCompletion(""); // Reset completion hook state
+      setClientError("");
     } catch (err) {
       console.error("Validation error:", err);
-      setError("Failed to validate SRT data");
+      setClientError("Failed to validate SRT data");
     }
   };
 
   // Process the SRT content with AI
   const processWithAI = async () => {
     if (!srtContent) return;
+    setClientError("");
+    setGeneratedTimestamps([]); // Clear previous results before new request
 
-    setIsProcessing(true);
-    setError("");
-    setGeneratedContent("");
-
-    try {
-      // Validate SRT content before sending to API
-      const contentValidation = srtContentSchema.safeParse({ srtContent });
-      if (!contentValidation.success) {
-        throw new Error(contentValidation.error.errors[0].message);
-      }
-
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ srtContent, isProMode, numTimestamps }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to generate timestamps");
-      }
-
-      // Handle streaming response
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let result = "";
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          const chunk = decoder.decode(value, { stream: true });
-          result += chunk;
-          setGeneratedContent(result);
-        }
-      }
-    } catch (err) {
-      console.error("Error generating timestamps:", err);
-      setError(err instanceof Error ? err.message : "Failed to process your file");
-    } finally {
-      setIsProcessing(false);
+    // Validate srtContent again just before sending (optional, but good practice)
+    const contentValidation = srtContentSchema.safeParse({ srtContent });
+    if (!contentValidation.success) {
+      setClientError(contentValidation.error.errors[0].message);
+      return;
     }
+
+    await complete(JSON.stringify({ srtContent, isProMode, numTimestamps }));
   };
+  
+  // Display combined error state
+  const currentError = completionError?.message || clientError;
 
   return (
     <div className="min-h-screen py-4 md:py-8 flex flex-col relative overflow-hidden">
@@ -207,12 +211,12 @@ export default function Home() {
         {/* Main Content - added justify-center to center content vertically */}
         <main className="flex flex-col items-center justify-center gap-6 md:gap-8 w-full flex-grow my-auto">
           {/* Step 1: File Upload (only show when not processing and no results) */}
-          {!isProcessing && !generatedContent && (
+          {!isLoading && generatedTimestamps.length === 0 && (
             <div className="w-full max-w-2xl flex flex-col gap-4">
               <SrtUploader
                 onContentExtracted={handleContentExtracted}
                 onProcessFile={processWithAI}
-                disabled={isProcessing}
+                disabled={isLoading} // Use isLoading from the hook
                 entriesCount={srtEntries.length}
                 hasContent={!!srtContent}
               />
@@ -240,7 +244,7 @@ export default function Home() {
           )}
 
           {/* Error Display (show at any step if there's an error) */}
-          {error && (
+          {currentError && (
             <div className="w-full max-w-2xl p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-3 animate-in fade-in duration-300">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -260,9 +264,13 @@ export default function Home() {
               </svg>
               <div className="text-red-600 dark:text-red-400 text-sm">
                 <p className="font-medium">Error</p>
-                <p>{error}</p>
-                {/* Add a retry button when there's an error */}
-                <Button variant="outline" size="sm" className="mt-2" onClick={() => setError("")}>
+                <p>{currentError}</p>
+                {/* Add a dismiss button for client-side errors */}
+                <Button variant="outline" size="sm" className="mt-2" onClick={() => {
+                  setClientError("");
+                  // Note: completionError from the hook might not be clearable this way
+                  // For a full reset, one might need to reset the hook's state if possible or re-initialize
+                }}>
                   Dismiss
                 </Button>
               </div>
@@ -270,17 +278,25 @@ export default function Home() {
           )}
 
           {/* Step 2 & 3: Processing or Results */}
-          {(isProcessing || generatedContent) && (
-            <div className="w-full flex flex-col items-center animate-in fade-in duration-300">
-              <TimestampResults isLoading={isProcessing} content={generatedContent} />
+          {/* Show TimestampResults if loading (to show skeleton) or if there are results */}
+          {(isLoading || generatedTimestamps.length > 0) && !currentError && (
+             <div className="w-full flex flex-col items-center animate-in fade-in duration-300">
+              <TimestampResults
+                isLoading={isLoading}
+                // Pass the structured data to TimestampResults (will be adapted in next step)
+                // For now, this will likely cause a type error in TimestampResults
+                content={generatedTimestamps as any} 
+              />
 
               {/* Only show reset button when results are generated and not loading */}
-              {generatedContent && !isProcessing && (
+              {generatedTimestamps.length > 0 && !isLoading && (
                 <Button
                   onClick={() => {
                     setSrtContent("");
                     setSrtEntries([]);
-                    setGeneratedContent("");
+                    setGeneratedTimestamps([]);
+                    setCompletion(""); // Reset completion hook data
+                    setClientError("");
                   }}
                   variant="outline"
                   className="mt-6 mb-8 md:mb-12"

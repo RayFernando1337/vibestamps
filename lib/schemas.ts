@@ -37,3 +37,22 @@ export const generateApiRequestSchema = z.object({
 
 // SRT Entries array schema
 export const srtEntriesSchema = z.array(srtEntrySchema);
+
+// Schema for a single AI-generated timestamp entry
+export const AITimestampEntrySchema = z.object({
+  time: z
+    .string()
+    .regex(
+      /^(\d{1,2}:\d{2}(:\d{2})?)$/,
+      "Invalid timestamp format. Expected MM:SS or HH:MM:SS"
+    ),
+  description: z
+    .string()
+    .min(3, "Description must be at least 3 characters")
+    .max(150, "Description must be at most 150 characters"),
+});
+
+// Schema for the overall AI-generated timestamps output
+export const AIGeneratedTimestampsOutputSchema = z.object({
+  timestamps: z.array(AITimestampEntrySchema),
+});

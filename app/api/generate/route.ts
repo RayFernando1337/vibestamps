@@ -1,8 +1,12 @@
 import { MAX_FILE_SIZE } from "@/lib/constants";
-import { generateApiRequestSchema } from "@/lib/schemas";
+import {
+  generateApiRequestSchema,
+  AIGeneratedTimestampsOutputSchema,
+} from "@/lib/schemas";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { streamText, wrapLanguageModel, type LanguageModelV1Middleware } from "ai";
+import { streamObject, wrapLanguageModel, type LanguageModelV1Middleware } from "ai";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 // Initialize the Google Generative AI provider
 const googleBase = createGoogleGenerativeAI({
@@ -114,106 +118,82 @@ export async function POST(request: Request) {
     const videoEndTimeInfo =
       maxTimestamp !== "00:00:00"
         ? `The video's maximum duration is ${maxTimestamp}. ANY TIMESTAMP BEYOND ${maxTimestamp} IS INVALID AND MUST NOT BE INCLUDED IN YOUR RESPONSE. Only generate timestamps within the range of 00:00 to ${maxTimestamp}.`
-        : "";
+        : "The video duration is unknown, but ensure all timestamps are chronologically ordered and make sense within a typical video context.";
 
-    // Determine the timestamp guidance based on numTimestamps
-    let timestampGuidance =
-      "Aim for a more manageable number of timestamps, aiming for a range of **5-12 timestamps** for the entire video, regardless of length. This is crucial for conciseness and to prevent an overly long list. Don't be afraid to be more selective.";
+    let currentOutputSchema = AIGeneratedTimestampsOutputSchema;
+    let timestampCountInstruction =
+      "Generate a list of 5-12 meaningful and concise timestamps that capture the key topics and demonstrations in the video.";
+
     if (numTimestamps && numTimestamps > 0) {
-      timestampGuidance = `Please generate exactly **${numTimestamps} evenly spaced timestamps** for the entire video. This is a strict requirement.`;
+      currentOutputSchema = AIGeneratedTimestampsOutputSchema.refine(
+        (data) => data.timestamps.length === numTimestamps,
+        {
+          message: `The AI must generate exactly ${numTimestamps} timestamp entries.`,
+        }
+      );
+      timestampCountInstruction = `Generate exactly ${numTimestamps} meaningful and evenly spaced timestamp entries. This is a strict requirement.`;
     }
 
-    // Create a system prompt that explains what we want from the model
     const systemPrompt = `
-      # Instructions for Generating Concise Video Timestamps from a Transcript
+      You are an expert AI assistant tasked with generating structured video timestamps from a transcript.
+      Your output MUST be a valid JSON object that strictly adheres to the following Zod schema:
 
-These instructions aim to generate precise, high-level timestamps for a video, focusing on key topics and demonstrations rather than every single sentence.
+      \`\`\`json
+      {
+        "type": "object",
+        "properties": {
+          "timestamps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "time": {
+                  "type": "string",
+                  "regex": "^(\\d{1,2}:\\d{2}(:\\d{2})?)$",
+                  "description": "Timestamp in MM:SS or HH:MM:SS format. Must be within the video's duration."
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 3,
+                  "maxLength": 150,
+                  "description": "A concise, action-oriented summary of the content at this timestamp (3-150 characters)."
+                }
+              },
+              "required": ["time", "description"]
+            }
+          }
+        },
+        "required": ["timestamps"]
+      }
+      \`\`\`
 
-**IMPORTANT VIDEO LENGTH CONSTRAINT: ${videoEndTimeInfo}**
+      Key Instructions:
+      1.  **Video Duration Constraint**: ${videoEndTimeInfo} All 'time' entries must respect this.
+      2.  **Timestamp Quantity**: ${timestampCountInstruction}
+      3.  **Content Analysis**: Analyze the provided transcript to identify major themes, demonstrations, and significant topic shifts.
+      4.  **Timestamp Accuracy**: Ensure timestamps are accurate (within a few seconds) to the content they describe.
+      5.  **Description Quality**: Descriptions should be specific, action-oriented, and capture the essence of the segment using keywords from the transcript.
+      6.  **Chronological Order**: All timestamp entries in the 'timestamps' array must be chronologically ordered.
+      7.  **Focus on Key Moments**: Prioritize timestamps representing significant concepts or demonstrations, avoiding redundant or minor details.
 
-**Input:** A video transcript in SRT or VTT format.
-
-**Output:** A list of timestamps and descriptions, formatted as follows:
-
-🕒 Key moments:
-00:00 [Exact 2-5 word hook]
-MM:SS [Specific, action-oriented description]
-...
-MM:SS [Specific final topic]
-
-**Process:**
-
-1. **Video Length:** The video length is ${maxTimestamp}. Do not generate any timestamps beyond ${maxTimestamp} under any circumstances.
-
-2. **Target Timestamp Quantity:** (Crucial Adjustment) ${timestampGuidance}
-
-3. **Content Analysis:** Analyze the transcript to identify major themes, demonstrations, and transitions. Focus on:
-
-   - **Introduction/Overview:** The start of the video, setting the stage.
-   - **Key Functional Demonstrations:** Precise moments where specific functions (generate text, generate object, etc.) are demonstrated with code.
-   - **Topic Shifts:** Significant transitions in the discussion (e.g., moving from theoretical discussion to practical coding examples).
-   - **Complex Concepts Explained:** Instances where complex concepts (like Zod schemas, tools, or generative UI) are introduced or clarified.
-   - **Example Builds/Demonstrations:** When code examples are presented and executed, highlighting the use of various functions.
-   - **Chatbot Interaction:** Any segment where the chatbot is discussed, or its construction and interaction are demonstrated.
-
-4. **Timestamp Selection:** Choose timestamps that align with the key moments identified. Aim for accuracy within ±5 seconds, prioritizing the overall flow and message rather than microscopic precision.
-
-5. **Description Generation:** Create concise descriptions (ideally 2-5 words) highlighting the core topic, for example:
-
-   - **Action-oriented verbs:** Start with verbs to emphasize the actions (e.g., "Demonstrating," "Explaining," "Introducing").
-   - **Key Words:** Capture the essence of the segment using keywords directly related to the content (e.g., "AI SDK," "Generative UI," "Zod schemas").
-   - **Concise phrasing:** Avoid lengthy descriptions; focus on conveying the main idea (e.g., "Chatbot development," "Building AI application").
-
-6. **Formatting and Structure:** Ensure timestamps are ordered chronologically.
-
-7. **Review and Refinement:** Thoroughly review to ensure:
-
-   - **Accuracy:** Ensure the descriptions accurately reflect the content at the given timestamp.
-   - **Conciseness:** Maintain the 2-5 word guideline for descriptions.
-   - **Consistency:** Maintain a consistent style and level of detail across all descriptions.
-   - **Relevance:** Prioritize timestamps representing significant concepts or demonstrations, avoiding redundant or minor details.
-
-**Example (improved formatting and descriptions):**
-
-\`\`\`
-🕒 Key Moments:
-00:00 Introduction and overview of AI SDK
-07:59 Explaining AI SDK capabilities
-16:16 Demonstrating generate text function
-29:59 Introducing Zod schemas for data extraction
-52:20 Building chatbot with AI SDK
-1:04:22 Demonstrating generative UI
-1:29:42 Best practices and tips for using SDK
-1:49:55 AI chatbot template showcase
-2:09:55 Final thoughts and next steps
-\`\`\`
-
-**Important Considerations for Long Videos:**
-
-* **Segmentation:** Divide the video into logical sections if the video is very long. This allows you to target specific sections.
-* **Contextual Keywords:** Incorporate keywords that reflect the context of the overall presentation.
-
-By following these guidelines, you can create a list of timestamps that effectively and concisely reflect the video's key moments and allow viewers to quickly navigate to the relevant parts.
-
-Now analyze the following transcript and generate timestamps following this format:
-
-🕒 Key moments:
-00:00 [2-5 word hook]
-MM:SS [Action-oriented description]
-...
+      Analyze the following transcript and generate the JSON output as described.
     `;
 
-    // Use the model with fallback middleware
-    const { textStream } = streamText({
+    // Use the model with fallback middleware and stream structured objects
+    const { partialObjectStream } = await streamObject({
       model: modelWithFallback,
-      prompt: `${systemPrompt}\n\nHere is the transcript content from an SRT file. Please analyze it and generate meaningful timestamps with summaries:\n\n${srtContent}`,
+      schema: currentOutputSchema,
+      prompt: `${systemPrompt}\n\nHere is the transcript content from an SRT file:\n\n${srtContent}`,
       temperature: 0.1,
-      maxTokens: 1500,
+      // maxTokens: 1500, // maxTokens is often not used or needed for object streaming as the structure dictates completion
     });
 
-    return new Response(textStream);
+    return new Response(partialObjectStream);
   } catch (error) {
     console.error("Error processing request:", error);
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: "Invalid request body", details: error.errors }, { status: 400 });
+    }
     return NextResponse.json({ error: "Failed to process request" }, { status: 500 });
   }
 }
