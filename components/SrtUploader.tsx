@@ -1,7 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { MAX_FILE_SIZE } from "@/lib/constants";
+import {
+  MAX_FILE_SIZE,
+  MIN_TIMESTAMP_COUNT,
+  MAX_TIMESTAMP_COUNT,
+} from "@/lib/constants";
 import { srtFileSchema } from "@/lib/schemas";
 import { extractTextFromSrt, parseSrtContent, SrtEntry } from "@/lib/srt-parser";
 import { useRef, useState } from "react";
@@ -12,6 +16,10 @@ interface SrtUploaderProps {
   disabled: boolean;
   entriesCount: number;
   hasContent: boolean;
+  granularity: "fewer" | "default" | "more";
+  onGranularityChange: (g: "fewer" | "default" | "more") => void;
+  timestampCount: number;
+  onTimestampCountChange: (c: number) => void;
 }
 
 export function SrtUploader({
@@ -20,10 +28,15 @@ export function SrtUploader({
   disabled,
   entriesCount,
   hasContent,
+  granularity,
+  onGranularityChange,
+  timestampCount,
+  onTimestampCountChange,
 }: SrtUploaderProps) {
   const [fileName, setFileName] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [isDragging, setIsDragging] = useState(false);
+  const [showProOptions, setShowProOptions] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -198,6 +211,54 @@ export function SrtUploader({
             <p className="text-sm text-sky-600 dark:text-sky-400 bg-sky-50/50 dark:bg-sky-900/20 px-4 py-2 rounded-full border border-sky-100/70 dark:border-sky-800/50">
               <span className="font-medium">{entriesCount}</span> entries found in the SRT file
             </p>
+            <div className="w-full max-w-xs">
+              <label htmlFor="granularity" className="sr-only">
+                Timestamp detail
+              </label>
+              <select
+                id="granularity"
+                value={granularity}
+                onChange={(e) =>
+                  onGranularityChange(e.target.value as "fewer" | "default" | "more")
+                }
+                className="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
+              >
+                <option value="fewer">Fewer timestamps</option>
+                <option value="default">Balanced</option>
+                <option value="more">More timestamps</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowProOptions((p) => !p)}
+              className="text-xs text-gray-600 dark:text-gray-400 underline"
+            >
+              {showProOptions ? "Hide Pro Options" : "Show Pro Options"}
+            </button>
+            {showProOptions && (
+              <div className="w-full max-w-xs flex flex-col items-center gap-2">
+                <label htmlFor="timestampCount" className="sr-only">
+                  Target timestamp count
+                </label>
+                <input
+                  type="range"
+                  id="timestampCount"
+                  min={MIN_TIMESTAMP_COUNT}
+                  max={MAX_TIMESTAMP_COUNT}
+                  value={timestampCount}
+                  onChange={(e) => onTimestampCountChange(Number(e.target.value))}
+                  className="w-full"
+                />
+                <input
+                  type="number"
+                  min={MIN_TIMESTAMP_COUNT}
+                  max={MAX_TIMESTAMP_COUNT}
+                  value={timestampCount}
+                  onChange={(e) => onTimestampCountChange(Number(e.target.value))}
+                  className="w-20 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-center"
+                />
+              </div>
+            )}
             <Button
               onClick={onProcessFile}
               className="w-full max-w-xs"
