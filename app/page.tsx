@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { srtContentSchema, srtEntriesSchema } from "@/lib/schemas";
 import { SrtEntry } from "@/lib/srt-parser";
+import { DEFAULT_TIMESTAMP_COUNT } from "@/lib/constants";
 import { Doto } from "next/font/google";
 import { useState } from "react";
 
@@ -19,6 +20,10 @@ export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [granularity, setGranularity] = useState<"fewer" | "default" | "more">(
+    "default"
+  );
+  const [timestampCount, setTimestampCount] = useState<number>(DEFAULT_TIMESTAMP_COUNT);
 
   // Handle extracted SRT content
   const handleContentExtracted = (content: string, entries: SrtEntry[]) => {
@@ -68,7 +73,7 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ srtContent }),
+        body: JSON.stringify({ srtContent, granularity, timestampCount }),
       });
 
       if (!response.ok) {
@@ -209,6 +214,10 @@ export default function Home() {
               disabled={isProcessing}
               entriesCount={srtEntries.length}
               hasContent={!!srtContent}
+              granularity={granularity}
+              onGranularityChange={setGranularity}
+              timestampCount={timestampCount}
+              onTimestampCountChange={setTimestampCount}
             />
           )}
 

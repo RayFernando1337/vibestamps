@@ -1,4 +1,8 @@
-import { MAX_FILE_SIZE } from "@/lib/constants";
+import {
+  MAX_FILE_SIZE,
+  MIN_TIMESTAMP_COUNT,
+  MAX_TIMESTAMP_COUNT,
+} from "@/lib/constants";
 import { generateApiRequestSchema } from "@/lib/schemas";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { streamText, wrapLanguageModel, type LanguageModelV1Middleware } from "ai";
@@ -73,7 +77,20 @@ export async function POST(request: Request) {
       );
     }
 
-    const { srtContent } = validationResult.data;
+    const { srtContent, granularity, timestampCount } = validationResult.data;
+
+    const granularitySetting = granularity ?? "default";
+    let timestampRange = "5-12";
+
+    if (typeof timestampCount === "number") {
+      const minRange = Math.max(MIN_TIMESTAMP_COUNT, timestampCount - 1);
+      const maxRange = Math.min(MAX_TIMESTAMP_COUNT, timestampCount + 1);
+      timestampRange = `${minRange}-${maxRange}`;
+    } else if (granularitySetting === "fewer") {
+      timestampRange = "3-6";
+    } else if (granularitySetting === "more") {
+      timestampRange = "10-20";
+    }
 
     // Extract the last timestamp from the SRT content using a more robust pattern
     // This looks for SRT timestamp patterns like "00:14:03,251 --> 00:14:03,751"
@@ -138,7 +155,7 @@ MM:SS [Specific final topic]
 
 1. **Video Length:** The video length is ${maxTimestamp}. Do not generate any timestamps beyond ${maxTimestamp} under any circumstances.
 
-2. **Target Timestamp Quantity:** (Crucial Adjustment) Aim for a more manageable number of timestamps, aiming for a range of **5-12 timestamps** for the entire video, regardless of length. This is crucial for conciseness and to prevent an overly long list. Don't be afraid to be more selective.
+2. **Target Timestamp Quantity:** (Crucial Adjustment) Aim for a more manageable number of timestamps, aiming for a range of **${timestampRange} timestamps** for the entire video, regardless of length. This is crucial for conciseness and to prevent an overly long list. Don't be afraid to be more selective.
 
 3. **Content Analysis:** Analyze the transcript to identify major themes, demonstrations, and transitions. Focus on:
 
