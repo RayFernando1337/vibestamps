@@ -19,6 +19,9 @@ export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [granularity, setGranularity] = useState<"fewer" | "default" | "more">(
+    "default"
+  );
 
   // Handle extracted SRT content
   const handleContentExtracted = (content: string, entries: SrtEntry[]) => {
@@ -68,7 +71,7 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ srtContent }),
+        body: JSON.stringify({ srtContent, granularity }),
       });
 
       if (!response.ok) {
@@ -209,6 +212,8 @@ export default function Home() {
               disabled={isProcessing}
               entriesCount={srtEntries.length}
               hasContent={!!srtContent}
+              granularity={granularity}
+              onGranularityChange={setGranularity}
             />
           )}
 

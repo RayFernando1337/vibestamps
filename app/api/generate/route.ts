@@ -73,7 +73,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const { srtContent } = validationResult.data;
+    const { srtContent, granularity } = validationResult.data;
+
+    const granularitySetting = granularity ?? "default";
+    let timestampRange = "5-12";
+    if (granularitySetting === "fewer") {
+      timestampRange = "3-6";
+    } else if (granularitySetting === "more") {
+      timestampRange = "10-20";
+    }
 
     // Extract the last timestamp from the SRT content using a more robust pattern
     // This looks for SRT timestamp patterns like "00:14:03,251 --> 00:14:03,751"
@@ -138,7 +146,7 @@ MM:SS [Specific final topic]
 
 1. **Video Length:** The video length is ${maxTimestamp}. Do not generate any timestamps beyond ${maxTimestamp} under any circumstances.
 
-2. **Target Timestamp Quantity:** (Crucial Adjustment) Aim for a more manageable number of timestamps, aiming for a range of **5-12 timestamps** for the entire video, regardless of length. This is crucial for conciseness and to prevent an overly long list. Don't be afraid to be more selective.
+2. **Target Timestamp Quantity:** (Crucial Adjustment) Aim for a more manageable number of timestamps, aiming for a range of **${timestampRange} timestamps** for the entire video, regardless of length. This is crucial for conciseness and to prevent an overly long list. Don't be afraid to be more selective.
 
 3. **Content Analysis:** Analyze the transcript to identify major themes, demonstrations, and transitions. Focus on:
 
