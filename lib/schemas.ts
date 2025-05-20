@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { MAX_FILE_SIZE } from "./constants";
+import {
+  MAX_FILE_SIZE,
+  MIN_TIMESTAMP_COUNT,
+  MAX_TIMESTAMP_COUNT,
+} from "./constants";
 
 // SRT Entry schema for validating individual entries
 export const srtEntrySchema = z.object({
@@ -31,7 +35,16 @@ export const generateApiRequestSchema = z.object({
   srtContent: z
     .string()
     .min(1, "SRT content is required")
-    .max(MAX_FILE_SIZE, `SRT content is too large. Maximum size is ${MAX_FILE_SIZE / 1024}KB`),
+    .max(
+      MAX_FILE_SIZE,
+      `SRT content is too large. Maximum size is ${MAX_FILE_SIZE / 1024}KB`
+    ),
+  timestampCount: z
+    .number()
+    .int()
+    .min(MIN_TIMESTAMP_COUNT)
+    .max(MAX_TIMESTAMP_COUNT)
+    .optional(),
 });
 
 // SRT Entries array schema

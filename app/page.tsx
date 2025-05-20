@@ -19,6 +19,7 @@ export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [timestampCount, setTimestampCount] = useState<number>(8);
 
   // Handle extracted SRT content
   const handleContentExtracted = (content: string, entries: SrtEntry[]) => {
@@ -68,7 +69,7 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ srtContent }),
+        body: JSON.stringify({ srtContent, timestampCount }),
       });
 
       if (!response.ok) {
@@ -209,6 +210,8 @@ export default function Home() {
               disabled={isProcessing}
               entriesCount={srtEntries.length}
               hasContent={!!srtContent}
+              timestampCount={timestampCount}
+              onTimestampCountChange={setTimestampCount}
             />
           )}
 
