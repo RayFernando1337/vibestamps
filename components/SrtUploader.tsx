@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { MAX_FILE_SIZE } from "@/lib/constants";
 import { srtFileSchema } from "@/lib/schemas";
 import { extractTextFromSrt, parseSrtContent, SrtEntry } from "@/lib/srt-parser";
@@ -12,6 +13,8 @@ interface SrtUploaderProps {
   disabled: boolean;
   entriesCount: number;
   hasContent: boolean;
+  granularity: "fewer" | "default" | "more";
+  onGranularityChange: (g: "fewer" | "default" | "more") => void;
 }
 
 export function SrtUploader({
@@ -20,6 +23,8 @@ export function SrtUploader({
   disabled,
   entriesCount,
   hasContent,
+  granularity,
+  onGranularityChange,
 }: SrtUploaderProps) {
   const [fileName, setFileName] = useState<string>("");
   const [error, setError] = useState<string>("");
@@ -198,6 +203,23 @@ export function SrtUploader({
             <p className="text-sm text-sky-600 dark:text-sky-400 bg-sky-50/50 dark:bg-sky-900/20 px-4 py-2 rounded-full border border-sky-100/70 dark:border-sky-800/50">
               <span className="font-medium">{entriesCount}</span> entries found in the SRT file
             </p>
+            <div className="w-full max-w-xs">
+              <label htmlFor="granularity" className="sr-only">
+                Timestamp detail
+              </label>
+              <Select
+                id="granularity"
+                value={granularity}
+                onChange={(e) =>
+                  onGranularityChange(e.target.value as "fewer" | "default" | "more")
+                }
+                className="w-full"
+              >
+                <option value="fewer">Fewer timestamps</option>
+                <option value="default">Balanced</option>
+                <option value="more">More timestamps</option>
+              </Select>
+            </div>
             <Button
               onClick={onProcessFile}
               className="w-full max-w-xs"
