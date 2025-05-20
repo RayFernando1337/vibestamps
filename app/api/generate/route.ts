@@ -73,7 +73,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { srtContent } = validationResult.data;
+    const { srtContent, numTimestamps } = validationResult.data;
 
     // Extract the last timestamp from the SRT content using a more robust pattern
     // This looks for SRT timestamp patterns like "00:14:03,251 --> 00:14:03,751"
@@ -116,6 +116,13 @@ export async function POST(request: Request) {
         ? `The video's maximum duration is ${maxTimestamp}. ANY TIMESTAMP BEYOND ${maxTimestamp} IS INVALID AND MUST NOT BE INCLUDED IN YOUR RESPONSE. Only generate timestamps within the range of 00:00 to ${maxTimestamp}.`
         : "";
 
+    // Determine the timestamp guidance based on numTimestamps
+    let timestampGuidance =
+      "Aim for a more manageable number of timestamps, aiming for a range of **5-12 timestamps** for the entire video, regardless of length. This is crucial for conciseness and to prevent an overly long list. Don't be afraid to be more selective.";
+    if (numTimestamps && numTimestamps > 0) {
+      timestampGuidance = `Please generate exactly **${numTimestamps} evenly spaced timestamps** for the entire video. This is a strict requirement.`;
+    }
+
     // Create a system prompt that explains what we want from the model
     const systemPrompt = `
       # Instructions for Generating Concise Video Timestamps from a Transcript
@@ -138,7 +145,7 @@ MM:SS [Specific final topic]
 
 1. **Video Length:** The video length is ${maxTimestamp}. Do not generate any timestamps beyond ${maxTimestamp} under any circumstances.
 
-2. **Target Timestamp Quantity:** (Crucial Adjustment) Aim for a more manageable number of timestamps, aiming for a range of **5-12 timestamps** for the entire video, regardless of length. This is crucial for conciseness and to prevent an overly long list. Don't be afraid to be more selective.
+2. **Target Timestamp Quantity:** (Crucial Adjustment) ${timestampGuidance}
 
 3. **Content Analysis:** Analyze the transcript to identify major themes, demonstrations, and transitions. Focus on:
 

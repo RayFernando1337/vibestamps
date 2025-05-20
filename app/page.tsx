@@ -5,6 +5,9 @@ import { SparklesText } from "@/components/magicui/sparkles-text";
 import { SrtUploader } from "@/components/SrtUploader";
 import { TimestampResults } from "@/components/TimestampResults";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { srtContentSchema, srtEntriesSchema } from "@/lib/schemas";
 import { SrtEntry } from "@/lib/srt-parser";
@@ -19,6 +22,8 @@ export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [isProMode, setIsProMode] = useState(false);
+  const [numTimestamps, setNumTimestamps] = useState(10);
 
   // Handle extracted SRT content
   const handleContentExtracted = (content: string, entries: SrtEntry[]) => {
@@ -68,7 +73,7 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ srtContent }),
+        body: JSON.stringify({ srtContent, isProMode, numTimestamps }),
       });
 
       if (!response.ok) {
@@ -203,13 +208,35 @@ export default function Home() {
         <main className="flex flex-col items-center justify-center gap-6 md:gap-8 w-full flex-grow my-auto">
           {/* Step 1: File Upload (only show when not processing and no results) */}
           {!isProcessing && !generatedContent && (
-            <SrtUploader
-              onContentExtracted={handleContentExtracted}
-              onProcessFile={processWithAI}
-              disabled={isProcessing}
-              entriesCount={srtEntries.length}
-              hasContent={!!srtContent}
-            />
+            <div className="w-full max-w-2xl flex flex-col gap-4">
+              <SrtUploader
+                onContentExtracted={handleContentExtracted}
+                onProcessFile={processWithAI}
+                disabled={isProcessing}
+                entriesCount={srtEntries.length}
+                hasContent={!!srtContent}
+              />
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="pro-mode"
+                  checked={isProMode}
+                  onCheckedChange={setIsProMode}
+                />
+                <Label htmlFor="pro-mode">Enable Pro Mode</Label>
+              </div>
+              {isProMode && (
+                <div className="grid w-full max-w-sm items-center gap-1.5">
+                  <Label htmlFor="num-timestamps">Number of Timestamps</Label>
+                  <Input
+                    type="number"
+                    id="num-timestamps"
+                    value={numTimestamps}
+                    onChange={(e) => setNumTimestamps(parseInt(e.target.value, 10))}
+                    placeholder="e.g., 10"
+                  />
+                </div>
+              )}
+            </div>
           )}
 
           {/* Error Display (show at any step if there's an error) */}

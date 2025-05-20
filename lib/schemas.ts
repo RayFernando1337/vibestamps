@@ -32,6 +32,7 @@ export const generateApiRequestSchema = z.object({
     .string()
     .min(1, "SRT content is required")
     .max(MAX_FILE_SIZE, `SRT content is too large. Maximum size is ${MAX_FILE_SIZE / 1024}KB`),
+  numTimestamps: z.number().int().positive().min(1).max(100).optional(),
 });
 
 // SRT Entries array schema
