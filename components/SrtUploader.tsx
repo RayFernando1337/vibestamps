@@ -1,7 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { MAX_FILE_SIZE } from "@/lib/constants";
+import {
+  MAX_FILE_SIZE,
+  MIN_TIMESTAMP_COUNT,
+  MAX_TIMESTAMP_COUNT,
+} from "@/lib/constants";
 import { srtFileSchema } from "@/lib/schemas";
 import { extractTextFromSrt, parseSrtContent, SrtEntry } from "@/lib/srt-parser";
 import { useRef, useState } from "react";
@@ -12,6 +16,8 @@ interface SrtUploaderProps {
   disabled: boolean;
   entriesCount: number;
   hasContent: boolean;
+  timestampCount: number;
+  onTimestampCountChange: (n: number) => void;
 }
 
 export function SrtUploader({
@@ -20,10 +26,13 @@ export function SrtUploader({
   disabled,
   entriesCount,
   hasContent,
+  timestampCount,
+  onTimestampCountChange,
 }: SrtUploaderProps) {
   const [fileName, setFileName] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [isDragging, setIsDragging] = useState(false);
+  const [showProOptions, setShowProOptions] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -198,6 +207,38 @@ export function SrtUploader({
             <p className="text-sm text-sky-600 dark:text-sky-400 bg-sky-50/50 dark:bg-sky-900/20 px-4 py-2 rounded-full border border-sky-100/70 dark:border-sky-800/50">
               <span className="font-medium">{entriesCount}</span> entries found in the SRT file
             </p>
+            <button
+              type="button"
+              className="text-sm text-sky-600 dark:text-sky-400 underline"
+              onClick={() => setShowProOptions((v) => !v)}
+            >
+              {showProOptions ? "Hide" : "Show"} Pro Options
+            </button>
+
+            {showProOptions && (
+              <div className="w-full max-w-xs flex items-center gap-2">
+                <label htmlFor="timestampCount" className="sr-only">
+                  Timestamp count
+                </label>
+                <input
+                  type="range"
+                  id="timestampCount"
+                  min={MIN_TIMESTAMP_COUNT}
+                  max={MAX_TIMESTAMP_COUNT}
+                  value={timestampCount}
+                  onChange={(e) => onTimestampCountChange(Number(e.target.value))}
+                  className="flex-1"
+                />
+                <input
+                  type="number"
+                  min={MIN_TIMESTAMP_COUNT}
+                  max={MAX_TIMESTAMP_COUNT}
+                  value={timestampCount}
+                  onChange={(e) => onTimestampCountChange(Number(e.target.value))}
+                  className="w-16 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-1 text-sm text-center"
+                />
+              </div>
+            )}
             <Button
               onClick={onProcessFile}
               className="w-full max-w-xs"

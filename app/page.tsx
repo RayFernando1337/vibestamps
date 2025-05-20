@@ -7,6 +7,7 @@ import { TimestampResults } from "@/components/TimestampResults";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { srtContentSchema, srtEntriesSchema } from "@/lib/schemas";
+import { DEFAULT_TIMESTAMP_COUNT } from "@/lib/constants";
 import { SrtEntry } from "@/lib/srt-parser";
 import { Doto } from "next/font/google";
 import { useState } from "react";
@@ -19,6 +20,9 @@ export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [timestampCount, setTimestampCount] = useState<number>(
+    DEFAULT_TIMESTAMP_COUNT
+  );
 
   // Handle extracted SRT content
   const handleContentExtracted = (content: string, entries: SrtEntry[]) => {
@@ -68,7 +72,7 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ srtContent }),
+        body: JSON.stringify({ srtContent, timestampCount }),
       });
 
       if (!response.ok) {
@@ -76,20 +80,8 @@ export default function Home() {
         throw new Error(errorData.error || "Failed to generate timestamps");
       }
 
-      // Handle streaming response
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let result = "";
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          const chunk = decoder.decode(value, { stream: true });
-          result += chunk;
-          setGeneratedContent(result);
-        }
-      }
+      const resultText = await response.text();
+      setGeneratedContent(resultText);
     } catch (err) {
       console.error("Error generating timestamps:", err);
       setError(err instanceof Error ? err.message : "Failed to process your file");
@@ -209,6 +201,8 @@ export default function Home() {
               disabled={isProcessing}
               entriesCount={srtEntries.length}
               hasContent={!!srtContent}
+              timestampCount={timestampCount}
+              onTimestampCountChange={setTimestampCount}
             />
           )}
 

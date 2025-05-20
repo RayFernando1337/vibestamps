@@ -1,7 +1,17 @@
-import { MAX_FILE_SIZE } from "@/lib/constants";
-import { generateApiRequestSchema } from "@/lib/schemas";
+import {
+  MAX_FILE_SIZE,
+  DEFAULT_TIMESTAMP_COUNT,
+} from "@/lib/constants";
+import {
+  generateApiRequestSchema,
+  aiResponseSchema,
+} from "@/lib/schemas";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { streamText, wrapLanguageModel, type LanguageModelV1Middleware } from "ai";
+import {
+  generateObject,
+  wrapLanguageModel,
+  type LanguageModelV1Middleware,
+} from "ai";
 import { NextResponse } from "next/server";
 
 // Initialize the Google Generative AI provider
@@ -73,7 +83,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const { srtContent } = validationResult.data;
+    const { srtContent, timestampCount } = validationResult.data;
+
+    const desiredCount = timestampCount ?? DEFAULT_TIMESTAMP_COUNT;
+    const timestampRange = `${Math.max(desiredCount - 2, 1)}-${desiredCount + 2}`;
 
     // Extract the last timestamp from the SRT content using a more robust pattern
     // This looks for SRT timestamp patterns like "00:14:03,251 --> 00:14:03,751"
@@ -138,7 +151,7 @@ MM:SS [Specific final topic]
 
 1. **Video Length:** The video length is ${maxTimestamp}. Do not generate any timestamps beyond ${maxTimestamp} under any circumstances.
 
-2. **Target Timestamp Quantity:** (Crucial Adjustment) Aim for a more manageable number of timestamps, aiming for a range of **5-12 timestamps** for the entire video, regardless of length. This is crucial for conciseness and to prevent an overly long list. Don't be afraid to be more selective.
+2. **Target Timestamp Quantity:** (Crucial Adjustment) Aim for a more manageable number of timestamps, aiming for a range of **${timestampRange} timestamps** for the entire video, regardless of length. This is crucial for conciseness and to prevent an overly long list. Don't be afraid to be more selective.
 
 3. **Content Analysis:** Analyze the transcript to identify major themes, demonstrations, and transitions. Focus on:
 
@@ -196,15 +209,36 @@ MM:SS [Action-oriented description]
 ...
     `;
 
-    // Use the model with fallback middleware
-    const { textStream } = streamText({
+    // Generate structured timestamps using the AI SDK
+    let {
+      object: aiResult,
+    } = await generateObject({
       model: modelWithFallback,
-      prompt: `${systemPrompt}\n\nHere is the transcript content from an SRT file. Please analyze it and generate meaningful timestamps with summaries:\n\n${srtContent}`,
+      system: systemPrompt,
+      prompt: `Here is the transcript content from an SRT file. Please generate ${desiredCount} meaningful timestamps with summaries in JSON format`,
+      schema: aiResponseSchema,
       temperature: 0.1,
       maxTokens: 1500,
     });
 
-    return new Response(textStream);
+    // If the count doesn't match, ask the model to correct it
+    if (aiResult.timestamps.length !== desiredCount) {
+      const followUp = await generateObject({
+        model: modelWithFallback,
+        system: systemPrompt,
+        prompt: `The previous response contained ${aiResult.timestamps.length} timestamps, but ${desiredCount} are required. Please regenerate exactly ${desiredCount} timestamps as JSON.`,
+        schema: aiResponseSchema,
+        temperature: 0.1,
+        maxTokens: 1500,
+      });
+      aiResult = followUp.object;
+    }
+
+    const textOutput = aiResult.timestamps
+      .map((t) => `${t.time} ${t.description}`)
+      .join("\n");
+
+    return new Response(textOutput);
   } catch (error) {
     console.error("Error processing request:", error);
     return NextResponse.json({ error: "Failed to process request" }, { status: 500 });
