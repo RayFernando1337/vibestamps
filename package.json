@@ -11,7 +11,9 @@
   "dependencies": {
     "@ai-sdk/google": "^1.2.3",
     "@radix-ui/react-progress": "^1.1.2",
+    "@radix-ui/react-label": "^1.0.5",
     "@radix-ui/react-slot": "^1.1.2",
+    "@radix-ui/react-switch": "^1.0.3",
     "@radix-ui/react-tooltip": "^1.1.8",
     "ai": "^4.2.6",
     "class-variance-authority": "^0.7.1",
