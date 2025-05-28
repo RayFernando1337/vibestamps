@@ -106,7 +106,7 @@ export function TimestampResults({ isLoading, content }: TimestampResultsProps) 
   return (
     <Card className="w-full max-w-3xl backdrop-blur-sm">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-xl text-emerald-800 dark:text-emerald-300">
+        <CardTitle className="text-base text-emerald-800 dark:text-emerald-300">
           Generated Timestamps
         </CardTitle>
         {content && !isLoading && (
@@ -132,12 +132,12 @@ export function TimestampResults({ isLoading, content }: TimestampResultsProps) 
       </CardHeader>
       <CardContent>
         <div className={isLoading ? "space-y-4 p-6" : "hidden"}>
-          <p className="text-sm text-sky-700/70 dark:text-sky-300/70 text-center">
+          <p className="text-xs text-sky-700/70 dark:text-sky-300/70 text-center">
             Analyzing your SRT file and generating timestamps...
           </p>
           <Progress value={progress} className="h-2" />
           <div className="flex justify-center">
-            <div className="animate-pulse text-sky-600/50 dark:text-sky-400/50 text-sm mt-2">
+            <div className="animate-pulse text-sky-600/50 dark:text-sky-400/50 text-xs mt-2">
               This may take a moment depending on file size
             </div>
           </div>
@@ -148,7 +148,9 @@ export function TimestampResults({ isLoading, content }: TimestampResultsProps) 
           <div className="animate-in fade-in duration-500">
             {content.includes("🕒 Key Moments:") || content.includes("🕒 Key moments:") ? (
               <div className="mb-4 text-center">
-                <p className="text-sky-700 dark:text-sky-300 text-lg font-medium">🕒 Key Moments</p>
+                <p className="text-sky-700 dark:text-sky-300 text-sm font-semibold">
+                  🕒 Key Moments
+                </p>
               </div>
             ) : null}
 
@@ -181,10 +183,10 @@ export function TimestampResults({ isLoading, content }: TimestampResultsProps) 
                   >
                     <div className="flex-1">
                       <div className="flex items-baseline">
-                        <span className="text-base font-medium text-emerald-600 dark:text-emerald-400 mr-3 whitespace-nowrap">
+                        <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mr-3 whitespace-nowrap">
                           {timePart}
                         </span>
-                        <span className="text-base text-slate-700 dark:text-slate-200">
+                        <span className="text-sm text-slate-700 dark:text-slate-200">
                           {description}
                         </span>
                       </div>

@@ -16,12 +16,28 @@ const doto = Doto({ weight: "900", subsets: ["latin"] });
 export default function Home() {
   const [srtContent, setSrtContent] = useState<string>("");
   const [srtEntries, setSrtEntries] = useState<SrtEntry[]>([]);
+  const [analysisData, setAnalysisData] = useState<
+    | {
+        optimalTimestampCount: number;
+        durationMinutes: number;
+        description: string;
+      }
+    | undefined
+  >(undefined);
   const [isProcessing, setIsProcessing] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<string>("");
   const [error, setError] = useState<string>("");
 
-  // Handle extracted SRT content
-  const handleContentExtracted = (content: string, entries: SrtEntry[]) => {
+  // Handle extracted SRT content with intelligent analysis
+  const handleContentExtracted = (
+    content: string,
+    entries: SrtEntry[],
+    analysisInfo: {
+      optimalTimestampCount: number;
+      durationMinutes: number;
+      description: string;
+    }
+  ) => {
     // Validate content and entries with Zod
     try {
       // Validate SRT content
@@ -40,17 +56,26 @@ export default function Home() {
 
       setSrtContent(content);
       setSrtEntries(entries);
+      setAnalysisData(analysisInfo);
       setGeneratedContent(""); // Reset previous results
       setError("");
+
+      console.log(
+        `🧠 Intelligent analysis complete: ${analysisInfo.optimalTimestampCount} timestamps for ${analysisInfo.durationMinutes}-minute video`
+      );
     } catch (err) {
       console.error("Validation error:", err);
       setError("Failed to validate SRT data");
     }
   };
 
-  // Process the SRT content with AI
+  // Process the SRT content with AI using intelligent analysis
   const processWithAI = async () => {
-    if (!srtContent) return;
+    if (!srtContent || !analysisData) return;
+
+    console.log(
+      `🎯 UI: About to send API request with ${analysisData.optimalTimestampCount} intelligently calculated timestamps`
+    );
 
     setIsProcessing(true);
     setError("");
@@ -68,7 +93,10 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ srtContent }),
+        body: JSON.stringify({
+          srtContent,
+          timestampCount: analysisData.optimalTimestampCount,
+        }),
       });
 
       if (!response.ok) {
@@ -134,15 +162,15 @@ export default function Home() {
       <div className="container max-w-5xl mx-auto px-4 flex flex-col flex-grow relative z-20">
         {/* Header */}
         <header className="flex flex-col items-center mb-4 md:mb-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className={`text-5xl md:text-7xl text-center font-bold ${doto.className}`}>
+          <div className="flex items-center gap-4 mb-4">
+            <div className={`text-lg md:text-lg text-center font-semibold ${doto.className}`}>
               Vibestamps
             </div>
           </div>
-          <p className="text-center text-gray-600 dark:text-gray-400 max-w-2xl px-16 md:px-0">
+          <p className="text-center text-gray-600 dark:text-gray-400 max-w-2xl px-16 md:px-0 text-sm">
             Upload a .srt file to generate meaningful timestamps for YouTube videos.
           </p>
-          <p className="text-center text-gray-600 dark:text-gray-400 max-w-2xl px-16 md:px-0 flex items-center justify-center gap-2 py-2">
+          <p className="text-center text-gray-600 dark:text-gray-400 max-w-2xl px-16 md:px-0 flex items-center justify-center gap-2 py-2 text-sm">
             Ray Fernando
             <a
               href="https://rfer.me/xprofilevshedr"
@@ -155,11 +183,17 @@ export default function Home() {
                 xmlns="http://www.w3.org/2000/svg"
                 width="16"
                 height="16"
-                fill="currentColor"
-                viewBox="0 0 16 16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="mr-2"
               >
                 <path d="M12.6.75h2.454l-5.36 6.142L16 15.25h-4.937l-3.867-5.07-4.425 5.07H.316l5.733-6.57L0 .75h5.063l3.495 4.633L12.601.75Zm-.86 13.028h1.36L4.323 2.145H2.865z" />
               </svg>
+              <span className="text-sm">Star</span>
             </a>
             <a
               href="https://rfer.me/RayYouTube-rvs"
@@ -209,12 +243,13 @@ export default function Home() {
               disabled={isProcessing}
               entriesCount={srtEntries.length}
               hasContent={!!srtContent}
+              analysisData={analysisData}
             />
           )}
 
           {/* Error Display (show at any step if there's an error) */}
           {error && (
-            <div className="w-full max-w-2xl p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-3 animate-in fade-in duration-300">
+            <div className="w-full max-w-2xl p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-4 animate-in fade-in duration-300">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="20"
@@ -232,7 +267,7 @@ export default function Home() {
                 <line x1="12" y1="16" x2="12.01" y2="16" />
               </svg>
               <div className="text-red-600 dark:text-red-400 text-sm">
-                <p className="font-medium">Error</p>
+                <p className="font-semibold">Error</p>
                 <p>{error}</p>
                 {/* Add a retry button when there's an error */}
                 <Button variant="outline" size="sm" className="mt-2" onClick={() => setError("")}>
@@ -253,6 +288,7 @@ export default function Home() {
                   onClick={() => {
                     setSrtContent("");
                     setSrtEntries([]);
+                    setAnalysisData(undefined);
                     setGeneratedContent("");
                   }}
                   variant="outline"
@@ -266,12 +302,12 @@ export default function Home() {
         </main>
 
         {/* Footer */}
-        <footer className="mt-auto pt-8 pb-8 text-gray-500 dark:text-gray-400 text-sm flex flex-col">
+        <footer className="mt-auto pt-8 pb-8 text-gray-500 dark:text-gray-400 text-xs flex flex-col">
+          <div className="text-center mb-2">
+            <p>Powered by</p>
+            <SparklesText text="Google Gemini" className="text-sm" sparklesCount={5} />
+          </div>
           <div className="flex items-center justify-between w-full">
-            {/* Gemini attribution */}
-            <div className="opacity-70 hover:opacity-100 transition-opacity">
-              <SparklesText text="Google Gemini" className="text-base" sparklesCount={5} />
-            </div>
             {/* Theme Toggle Button */}
             <div className="absolute bottom-0 right-4 md:bottom-8 md:right-4">
               <ThemeToggle />

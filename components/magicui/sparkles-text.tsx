@@ -142,7 +142,7 @@ export const SparklesText: React.FC<SparklesTextProps> = ({
 
   return (
     <div
-      className={cn("text-6xl font-bold text-emerald-800 dark:text-emerald-300", className)}
+      className={cn("text-lg font-semibold text-emerald-800 dark:text-emerald-300", className)}
       {...props}
       style={
         {

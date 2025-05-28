@@ -22,9 +22,9 @@ const buttonVariants = cva(
         link: "text-emerald-600 dark:text-emerald-400 underline-offset-4 hover:underline hover:text-emerald-500 dark:hover:text-emerald-300",
       },
       size: {
-        default: "h-10 px-5 py-2 has-[>svg]:px-4",
-        sm: "h-9 rounded-full gap-1.5 px-4 has-[>svg]:px-3",
-        lg: "h-11 rounded-full px-7 has-[>svg]:px-5 text-base",
+        default: "h-10 px-4 py-2 has-[>svg]:px-4",
+        sm: "h-8 rounded-full gap-2 px-4 has-[>svg]:px-3",
+        lg: "h-12 rounded-full px-8 has-[>svg]:px-6 text-base",
         icon: "size-10",
       },
     },

@@ -1,7 +1,9 @@
 import { MAX_FILE_SIZE } from "@/lib/constants";
-import { generateApiRequestSchema } from "@/lib/schemas";
+import { generateApiRequestSchema, timestampsOutputSchema } from "@/lib/schemas";
+import { getVideoMetadata, parseSrtContent, secondsToReadableTime } from "@/lib/srt-parser";
+import { analyzeVideoForProcessing } from "@/lib/video-analyzer";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { streamText, wrapLanguageModel, type LanguageModelV1Middleware } from "ai";
+import { streamObject, wrapLanguageModel, type LanguageModelV1Middleware } from "ai";
 import { NextResponse } from "next/server";
 
 // Initialize the Google Generative AI provider
@@ -73,138 +75,218 @@ export async function POST(request: Request) {
       );
     }
 
-    const { srtContent } = validationResult.data;
+    const { srtContent, timestampCount } = validationResult.data;
 
-    // Extract the last timestamp from the SRT content using a more robust pattern
-    // This looks for SRT timestamp patterns like "00:14:03,251 --> 00:14:03,751"
-    const timestampRegex = /(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})/g;
-    let maxTimestamp = "00:00:00";
-    let match;
+    console.log(`🎯 API received request for ${timestampCount} timestamps`);
 
-    // Find all timestamp pairs and get the latest end time
-    while ((match = timestampRegex.exec(srtContent)) !== null) {
-      const endTime = match[2]; // Second capture group is the end time
-      // Convert to seconds for comparison
-      const endTimeParts = endTime.split(/[,:]/);
-      const endTimeSeconds =
-        parseInt(endTimeParts[0]) * 3600 +
-        parseInt(endTimeParts[1]) * 60 +
-        parseInt(endTimeParts[2]) +
-        parseInt(endTimeParts[3]) / 1000;
+    // Parse SRT content using our intelligent system
+    const srtEntries = parseSrtContent(srtContent);
 
-      const maxTimeParts = maxTimestamp.split(/[,:]/);
-      const maxTimeSeconds =
-        parseInt(maxTimeParts[0]) * 3600 +
-        parseInt(maxTimeParts[1]) * 60 +
-        parseInt(maxTimeParts[2] || "0") +
-        parseInt(maxTimeParts[3] || "0") / 1000;
-
-      if (endTimeSeconds > maxTimeSeconds) {
-        // Format nicely for display: HH:MM:SS
-        const hours = endTimeParts[0];
-        const minutes = endTimeParts[1];
-        const seconds = endTimeParts[2];
-
-        // Keep only hours if non-zero, otherwise just show MM:SS
-        maxTimestamp = hours !== "00" ? `${hours}:${minutes}:${seconds}` : `${minutes}:${seconds}`;
-      }
+    if (srtEntries.length === 0) {
+      return NextResponse.json(
+        { error: "Could not parse any valid entries from the SRT content" },
+        { status: 400 }
+      );
     }
 
-    // Create more explicit constraints about the video end time
-    const videoEndTimeInfo =
-      maxTimestamp !== "00:00:00"
-        ? `The video's maximum duration is ${maxTimestamp}. ANY TIMESTAMP BEYOND ${maxTimestamp} IS INVALID AND MUST NOT BE INCLUDED IN YOUR RESPONSE. Only generate timestamps within the range of 00:00 to ${maxTimestamp}.`
-        : "";
+    // Get comprehensive video metadata and analysis
+    const metadata = getVideoMetadata(srtEntries);
+    const analysis = analyzeVideoForProcessing(metadata);
 
-    // Create a system prompt that explains what we want from the model
+    // Get readable duration format
+    const maxTimestamp = secondsToReadableTime(metadata.durationSeconds);
+    const totalVideoSeconds = metadata.durationSeconds;
+
+    console.log(`🧠 Intelligent analysis complete:`);
+    console.log(
+      `   Video duration: ${metadata.durationMinutes} minutes (${metadata.durationSeconds} seconds)`
+    );
+    console.log(`   Video category: ${metadata.videoCategory}`);
+    console.log(`   Content density: ${metadata.contentDensity}`);
+    console.log(`   Processing strategy: ${analysis.processingStrategy}`);
+    console.log(`   Recommended chunks: ${analysis.recommendedChunkCount}`);
+    console.log(`   Quality expectation: ${analysis.qualityExpectation}`);
+
+    // Calculate intelligent distribution for guidance (but LM will decide final positions)
+    const calculateIntelligentDistribution = (totalSeconds: number, count: number): string[] => {
+      if (count === 1) return ["00:00"];
+
+      const suggestions = [];
+      // Always start with 00:00
+      suggestions.push("00:00");
+
+      // For remaining timestamps, distribute evenly but intelligently
+      for (let i = 1; i < count; i++) {
+        const position = (totalSeconds / (count - 1)) * i;
+        const readableTime = secondsToReadableTime(position);
+        suggestions.push(readableTime);
+      }
+
+      return suggestions;
+    };
+
+    const suggestedTimestamps = calculateIntelligentDistribution(totalVideoSeconds, timestampCount);
+    console.log(
+      `🎯 Calculated distribution for ${timestampCount} timestamps across ${metadata.durationMinutes} minutes:`,
+      suggestedTimestamps
+    );
+
+    // Create enhanced system prompt using proven strategies
     const systemPrompt = `
-      # Instructions for Generating Concise Video Timestamps from a Transcript
+You are a video timestamp generator using proven content analysis strategies. Your task is to analyze a video transcript and create meaningful timestamps that help viewers navigate to key moments.
 
-These instructions aim to generate precise, high-level timestamps for a video, focusing on key topics and demonstrations rather than every single sentence.
+CRITICAL REQUIREMENT: Generate EXACTLY ${timestampCount} timestamps. No more, no less.
 
-**IMPORTANT VIDEO LENGTH CONSTRAINT: ${videoEndTimeInfo}**
+VIDEO ANALYSIS:
+- Total duration: ${maxTimestamp} (${metadata.durationMinutes} minutes)
+- Content density: ${metadata.contentDensity} (${metadata.estimatedWordsPerMinute} words/min)
+- Video category: ${metadata.videoCategory}
+- Processing strategy: ${analysis.processingStrategy}
+- Required timestamps: ${timestampCount}
 
-**Input:** A video transcript in SRT or VTT format.
+PROVEN CONTENT FOCUS AREAS:
+Find ${timestampCount} KEY MOMENTS representing:
+- Introduction/Overview: Video opening and context setting
+- Functional Demonstrations: Code execution, feature demonstrations, practical examples
+- Topic Shifts: Major transitions between concepts or sections
+- Complex Concepts: Detailed explanations of technical or important concepts
+- Example Builds: Practical coding examples and applications
+- Conclusions: Summaries, final thoughts, and wrap-ups
 
-**Output:** A list of timestamps and descriptions, formatted as follows:
+INTELLIGENT DISTRIBUTION GUIDANCE:
+Use these timeframes as GUIDANCE for finding meaningful content:
 
-🕒 Key moments:
-00:00 [Exact 2-5 word hook]
-MM:SS [Specific, action-oriented description]
-...
-MM:SS [Specific final topic]
+${suggestedTimestamps
+  .map((ts, i) => {
+    if (i === 0) return `- Around ${ts}: Find the introduction, overview, or opening key point`;
+    if (i === timestampCount - 1)
+      return `- Around ${ts}: Find the conclusion, summary, or final important point`;
+    return `- Around ${ts}: Find significant content, major topic changes, or key demonstrations`;
+  })
+  .join("\n")}
 
-**Process:**
+DESCRIPTION REQUIREMENTS (PROVEN EFFECTIVE):
+- EXACTLY 2-5 words per description
+- Start with action verbs: "Demonstrating", "Explaining", "Building", "Introducing"
+- Include key technical terms and concepts
+- Focus on what viewers would want to jump to
+- Prioritize content flow over exact precision (±5 seconds is fine)
 
-1. **Video Length:** The video length is ${maxTimestamp}. Do not generate any timestamps beyond ${maxTimestamp} under any circumstances.
+CONTENT ANALYSIS INSTRUCTIONS:
+- Use time ranges as GUIDANCE, not exact positions
+- Within each timeframe, find the MOST IMPORTANT or INTERESTING moment
+- Look for: topic introductions, key explanations, major transitions, examples, conclusions
+- Adjust timestamps to match when something meaningful actually happens
+- Choose timestamps that provide genuine navigation value
 
-2. **Target Timestamp Quantity:** (Crucial Adjustment) Aim for a more manageable number of timestamps, aiming for a range of **5-12 timestamps** for the entire video, regardless of length. This is crucial for conciseness and to prevent an overly long list. Don't be afraid to be more selective.
+DISTRIBUTION REQUIREMENTS:
+- MUST span the ENTIRE video duration from 00:00 to ${maxTimestamp}
+- Do NOT cluster all timestamps at the beginning
+- Ensure good coverage across the full timeline
+- Each timestamp should be in a different section of the video
+- Prioritize content quality over mathematical precision
 
-3. **Content Analysis:** Analyze the transcript to identify major themes, demonstrations, and transitions. Focus on:
+COUNT VALIDATION:
+- You must provide exactly ${timestampCount} timestamps in the array
+- Set actualCount to ${timestampCount}
+- All timestamps must be unique (no duplicates)
+- Validate timestamps are within 00:00 to ${maxTimestamp}
 
-   - **Introduction/Overview:** The start of the video, setting the stage.
-   - **Key Functional Demonstrations:** Precise moments where specific functions (generate text, generate object, etc.) are demonstrated with code.
-   - **Topic Shifts:** Significant transitions in the discussion (e.g., moving from theoretical discussion to practical coding examples).
-   - **Complex Concepts Explained:** Instances where complex concepts (like Zod schemas, tools, or generative UI) are introduced or clarified.
-   - **Example Builds/Demonstrations:** When code examples are presented and executed, highlighting the use of various functions.
-   - **Chatbot Interaction:** Any segment where the chatbot is discussed, or its construction and interaction are demonstrated.
-
-4. **Timestamp Selection:** Choose timestamps that align with the key moments identified. Aim for accuracy within ±5 seconds, prioritizing the overall flow and message rather than microscopic precision.
-
-5. **Description Generation:** Create concise descriptions (ideally 2-5 words) highlighting the core topic, for example:
-
-   - **Action-oriented verbs:** Start with verbs to emphasize the actions (e.g., "Demonstrating," "Explaining," "Introducing").
-   - **Key Words:** Capture the essence of the segment using keywords directly related to the content (e.g., "AI SDK," "Generative UI," "Zod schemas").
-   - **Concise phrasing:** Avoid lengthy descriptions; focus on conveying the main idea (e.g., "Chatbot development," "Building AI application").
-
-6. **Formatting and Structure:** Ensure timestamps are ordered chronologically.
-
-7. **Review and Refinement:** Thoroughly review to ensure:
-
-   - **Accuracy:** Ensure the descriptions accurately reflect the content at the given timestamp.
-   - **Conciseness:** Maintain the 2-5 word guideline for descriptions.
-   - **Consistency:** Maintain a consistent style and level of detail across all descriptions.
-   - **Relevance:** Prioritize timestamps representing significant concepts or demonstrations, avoiding redundant or minor details.
-
-**Example (improved formatting and descriptions):**
-
-\`\`\`
-🕒 Key Moments:
-00:00 Introduction and overview of AI SDK
-07:59 Explaining AI SDK capabilities
-16:16 Demonstrating generate text function
-29:59 Introducing Zod schemas for data extraction
-52:20 Building chatbot with AI SDK
-1:04:22 Demonstrating generative UI
-1:29:42 Best practices and tips for using SDK
-1:49:55 AI chatbot template showcase
-2:09:55 Final thoughts and next steps
-\`\`\`
-
-**Important Considerations for Long Videos:**
-
-* **Segmentation:** Divide the video into logical sections if the video is very long. This allows you to target specific sections.
-* **Contextual Keywords:** Incorporate keywords that reflect the context of the overall presentation.
-
-By following these guidelines, you can create a list of timestamps that effectively and concisely reflect the video's key moments and allow viewers to quickly navigate to the relevant parts.
-
-Now analyze the following transcript and generate timestamps following this format:
-
-🕒 Key moments:
-00:00 [2-5 word hook]
-MM:SS [Action-oriented description]
-...
+Your job is to intelligently analyze the content and find the most meaningful moments that align with proven content navigation patterns, not just place timestamps at mathematical positions.
     `;
 
-    // Use the model with fallback middleware
-    const { textStream } = streamText({
+    console.log(`🎯 Using Zod schema validation for exactly ${timestampCount} timestamps`);
+
+    // Use structured output with automatic Zod validation and retry
+    const { partialObjectStream } = streamObject({
       model: modelWithFallback,
-      prompt: `${systemPrompt}\n\nHere is the transcript content from an SRT file. Please analyze it and generate meaningful timestamps with summaries:\n\n${srtContent}`,
+      prompt: `${systemPrompt}\n\nAnalyze this video transcript and generate exactly ${timestampCount} high-quality timestamps using proven content analysis strategies:\n\n${srtContent}`,
+      schema: timestampsOutputSchema,
       temperature: 0.1,
-      maxTokens: 1500,
+      maxRetries: 5,
     });
 
-    return new Response(textStream);
+    // Transform structured output to text stream for UI compatibility
+    return new Response(
+      new ReadableStream({
+        async start(controller) {
+          try {
+            let lastFormattedOutput = "";
+            let finalObject = null;
+
+            for await (const partialObject of partialObjectStream) {
+              finalObject = partialObject; // Keep track of the latest object
+
+              if (partialObject?.timestamps && partialObject.timestamps.length > 0) {
+                // Format the timestamps in the expected UI format
+                let formattedOutput = "🕒 Key moments:\n";
+                partialObject.timestamps.forEach((timestamp) => {
+                  if (timestamp?.time && timestamp?.description) {
+                    formattedOutput += `${timestamp.time} ${timestamp.description}\n`;
+                  }
+                });
+
+                // Only send if the output has changed to avoid duplicates
+                if (formattedOutput !== lastFormattedOutput) {
+                  controller.enqueue(new TextEncoder().encode(formattedOutput));
+                  lastFormattedOutput = formattedOutput;
+                }
+              }
+            }
+
+            // Log validation results with enhanced information
+            if (finalObject) {
+              const actualCount = finalObject.timestamps?.length || 0;
+              const requestedCount = finalObject.requestedCount || timestampCount;
+
+              console.log(`✅ Intelligent timestamp generation completed:`);
+              console.log(
+                `   Video: ${metadata.durationMinutes} minutes, ${metadata.videoCategory} category`
+              );
+              console.log(
+                `   Strategy: ${analysis.processingStrategy} with ${analysis.qualityExpectation} quality`
+              );
+              console.log(`   Requested: ${requestedCount} timestamps`);
+              console.log(`   Generated: ${actualCount} timestamps`);
+              console.log(`   Validation: ${actualCount === requestedCount ? "PASSED" : "FAILED"}`);
+
+              if (actualCount !== requestedCount) {
+                console.warn(
+                  `⚠️  Count mismatch detected - Zod validation should have caught this`
+                );
+              }
+            }
+
+            controller.close();
+          } catch (error) {
+            console.error("Structured output error:", error);
+
+            // Enhanced error handling with analysis context
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            if (errorMessage.includes("validation") || errorMessage.includes("schema")) {
+              console.error("🚨 Zod validation failed after retries:", errorMessage);
+              console.error(
+                `Context: ${metadata.durationMinutes}min ${metadata.videoCategory} video, ${analysis.processingStrategy} strategy`
+              );
+              const errorOutput = `🕒 Validation Error:\nFailed to generate exactly ${timestampCount} timestamps for this ${metadata.durationMinutes}-minute video after multiple attempts. Please try again.`;
+              controller.enqueue(new TextEncoder().encode(errorOutput));
+            } else {
+              const errorOutput =
+                "🕒 Error generating timestamps:\nPlease try again with a different file.";
+              controller.enqueue(new TextEncoder().encode(errorOutput));
+            }
+
+            controller.close();
+          }
+        },
+      }),
+      {
+        headers: {
+          "Content-Type": "text/plain",
+          "Cache-Control": "no-cache",
+        },
+      }
+    );
   } catch (error) {
     console.error("Error processing request:", error);
     return NextResponse.json({ error: "Failed to process request" }, { status: 500 });
