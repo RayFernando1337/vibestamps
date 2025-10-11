@@ -77,90 +77,112 @@ export async function POST(request: Request) {
 
     // Create a system prompt that explains what we want from the model
     const systemPrompt = `
-      # Instructions for Generating Concise Video Timestamps from a Transcript
-
-These instructions aim to generate precise, high-level timestamps for a video, focusing on key topics and demonstrations rather than every single sentence.
+<file_contents>
+\`\`\`srt
+${srtContent}
+\`\`\`
+</file_contents>
+<meta prompt 1 = "Generate Timestamps v4">
+# Timestamp Generation Guidelines v4.0
 
 **IMPORTANT VIDEO LENGTH CONSTRAINT: ${videoEndTimeInfo}**
 
-**Input:** A video transcript in SRT or VTT format.
+These instructions are designed to generate a comprehensive, yet scannable, set of timestamps from a video transcript, especially for longer formats like livestreams. The goal is to capture not just major topics, but also specific demonstrations, key insights, and memorable moments that provide maximum value to the viewer.
 
-**Output:** A list of timestamps and descriptions, formatted as follows:
+### Core Principles
 
-🕒 Key moments:
-00:00 [Exact 2-5 word hook]
-MM:SS [Specific, action-oriented description]
-...
-MM:SS [Specific final topic]
+1. **Content-Density Over Fixed Numbers:** The number of timestamps should reflect the density of the content, not a fixed count. As a general guideline, aim for **one key moment every 5-10 minutes**, but be flexible. A dense 10-minute segment might need two timestamps, while a 15-minute casual chat might only need one.
+2. **Capture Value, Not Just Topics:** The best timestamps point to specific, valuable information. A viewer should be able to look at the list and immediately find a pro-tip, a deep-dive, or a specific answer.
+3. **Be Specific and Action-Oriented:** Descriptions should be concise (3-6 words) and clearly state what is happening. Use action verbs to convey activity and learning.
 
-**Process:**
+### Step-by-Step Process
 
-1. **Video Length:** The video length is ${maxTimestamp}. Do not generate any timestamps beyond ${maxTimestamp} under any circumstances.
+### Step 1: Initial Analysis
 
-2. **Target Timestamp Quantity:** (Crucial Adjustment) Aim for a more manageable number of timestamps, aiming for a range of **5-12 timestamps** for the entire video, regardless of length. This is crucial for conciseness and to prevent an overly long list. Don't be afraid to be more selective.
+- Determine the total video duration from the final timestamp in the transcript. The video length is ${maxTimestamp}. Do not generate any timestamps beyond ${maxTimestamp} under any circumstances.
+- Quickly read through the transcript to get a high-level sense of the main themes and the overall flow of the session.
 
-3. **Content Analysis:** Analyze the transcript to identify major themes, demonstrations, and transitions. Focus on:
+### Step 2: Identify Key Moments
 
-   - **Introduction/Overview:** The start of the video, setting the stage.
-   - **Key Functional Demonstrations:** Precise moments where specific functions (generate text, generate object, etc.) are demonstrated with code.
-   - **Topic Shifts:** Significant transitions in the discussion (e.g., moving from theoretical discussion to practical coding examples).
-   - **Complex Concepts Explained:** Instances where complex concepts (like Zod schemas, tools, or generative UI) are introduced or clarified.
-   - **Example Builds/Demonstrations:** When code examples are presented and executed, highlighting the use of various functions.
-   - **Chatbot Interaction:** Any segment where the chatbot is discussed, or its construction and interaction are demonstrated.
+Scan the transcript for the following types of content. This goes beyond simple topic changes and is the key to creating a rich, useful list.
 
-4. **Timestamp Selection:** Choose timestamps that align with the key moments identified. Aim for accuracy within ±5 seconds, prioritizing the overall flow and message rather than microscopic precision.
+- **The Hook:** Always create a \`00:00:00\` timestamp that uses the first few impactful words of the video.
+- **Major Topic Shifts:** The most obvious markers, such as moving from a news update to a personal project demo.
+- **Specific Feature Demonstrations:** Pinpoint the exact moment a feature is shown and explained.
+    - *Example:* "How to integrate Claude Code into Cursor"
+- **"Pro-Tip" or "Nugget" Segments:** Isolate moments where a specific, non-obvious piece of advice is given that could save a viewer time or trouble.
+    - *Example:* "Pro-tip for Stripe integration (the 'closed-loop' problem)"
+- **Workflow Deep Dives:** Capture segments dedicated to explaining *how* the host accomplishes a complex task from start to finish.
+    - *Example:* "Detailing his advanced Claude Code workflow"
+- **Live Discoveries or "Aha!" Moments:** If the host discovers a new feature or has a moment of realization live on stream, capture it. It adds personality and is often highly engaging.
+    - *Example:* "Discovering the Magic UI Command Palette"
+- **Community & Meta Moments:** Acknowledge significant interactions with the community or milestones reached during the stream.
+    - *Example:* "The MLX transcriber repo hits 420 stars"
+- **Philosophical or "Soapbox" Segments:** If the host takes a moment to share their broader thoughts on a topic, it's a distinct content block worth timestamping.
+    - *Example:* "His birthday 'preach' on AI engineering"
 
-5. **Description Generation:** Create concise descriptions (ideally 2-5 words) highlighting the core topic, for example:
+### Step 3: Draft Timestamps and Descriptions
 
-   - **Action-oriented verbs:** Start with verbs to emphasize the actions (e.g., "Demonstrating," "Explaining," "Introducing").
-   - **Key Words:** Capture the essence of the segment using keywords directly related to the content (e.g., "AI SDK," "Generative UI," "Zod schemas").
-   - **Concise phrasing:** Avoid lengthy descriptions; focus on conveying the main idea (e.g., "Chatbot development," "Building AI application").
+- For each identified moment, note the \`HH:MM:SS\` where it begins.
+- Write a concise, specific, and action-oriented description (3-6 words).
+    - **Good:** "Explaining the new Cursor pricing tiers"
+    - **Avoid:** "Talks about pricing"
+    - **Good:** "Final walkthrough of Claude Code setup in Cursor"
+    - **Avoid:** "Claude Code"
+- Use parentheses to add clarifying context where needed (e.g., \`(the 'closed-loop' problem)\`).
 
-6. **Formatting and Structure:** Ensure timestamps are ordered chronologically.
+### Step 4: Format and Review
 
-7. **Review and Refinement:** Thoroughly review to ensure:
+1. Assemble the final list in chronological order.
+2. Use the standard format:
+    
+    \`\`\`markdown
+    🕒 Key moments:
+    00:00:00 [Initial 3-5 word hook]
+    HH:MM:SS [Specific, action-oriented description]
+    HH:MM:SS [Specific, action-oriented description]
+    ...
+    \`\`\`
+    
+3. Read the entire list from top to bottom. Does it tell the story of the video? Is it easy to scan? Ensure the timestamps are accurate and the descriptions are valuable. Adjust wording for clarity and impact.
 
-   - **Accuracy:** Ensure the descriptions accurately reflect the content at the given timestamp.
-   - **Conciseness:** Maintain the 2-5 word guideline for descriptions.
-   - **Consistency:** Maintain a consistent style and level of detail across all descriptions.
-   - **Relevance:** Prioritize timestamps representing significant concepts or demonstrations, avoiding redundant or minor details.
+### Gold Standard Example
 
-**Example (improved formatting and descriptions):**
+This is the target quality and format for the final output:
 
 \`\`\`
-🕒 Key Moments:
-00:00 Introduction and overview of AI SDK
-07:59 Explaining AI SDK capabilities
-16:16 Demonstrating generate text function
-29:59 Introducing Zod schemas for data extraction
-52:20 Building chatbot with AI SDK
-1:04:22 Demonstrating generative UI
-1:29:42 Best practices and tips for using SDK
-1:49:55 AI chatbot template showcase
-2:09:55 Final thoughts and next steps
-\`\`\`
-
-**Important Considerations for Long Videos:**
-
-* **Segmentation:** Divide the video into logical sections if the video is very long. This allows you to target specific sections.
-* **Contextual Keywords:** Incorporate keywords that reflect the context of the overall presentation.
-
-By following these guidelines, you can create a list of timestamps that effectively and concisely reflect the video's key moments and allow viewers to quickly navigate to the relevant parts.
-
-Now analyze the following transcript and generate timestamps following this format:
-
 🕒 Key moments:
-00:00 [2-5 word hook]
-MM:SS [Action-oriented description]
-...
+00:00:00 Cursor to refund unexpected charges
+00:02:11 Explaining the new Cursor pricing tiers
+00:04:38 How to claim a refund for overages
+00:08:20 Showcasing the "Ray Transcribes" app
+00:10:43 Recommending Magic UI templates
+00:14:40 How to integrate Claude Code into Cursor
+00:18:30 Discovering the Magic UI Command Palette
+00:24:25 Detailing advanced Claude Code workflow
+00:32:40 Pro-tip for Stripe integration (the "closed-loop" problem)
+00:35:20 Claude Code terminal navigation tips
+00:39:35 The MLX transcriber repo hits 420 stars
+00:44:40 Deep dive into the Claude Code workflow
+00:52:56 Explaining the full development stack
+00:59:08 Final recap of the Cursor pricing changes
+1:08:08 Explaining YouTube memberships and Discord access
+1:12:00 Ray's birthday "preach" on AI engineering
+1:19:50 Using Claude Code to plan app launch
+1:25:36 Deep dive on the "planning mode" workflow
+1:32:21 Final walkthrough of Claude Code setup in Cursor
+\`\`\`
+</meta prompt 1>
+<user_instructions>
+Generate timestamps for this video using the Generate Timestamps v4 instructions. The video is ${maxTimestamp} long, so provide an appropriate number of timestamps based on content density (aim for one key moment every 5-10 minutes as a guideline).
+</user_instructions>
     `;
 
     // Use the AI Gateway model with Gemini 2.5 Pro
     const result = streamText({
       model: model,
-      prompt: `${systemPrompt}\n\nHere is the transcript content from an SRT file. Please analyze it and generate meaningful timestamps with summaries:\n\n${srtContent}`,
-      temperature: 0.1,
-      maxOutputTokens: 2500,
+      prompt: systemPrompt,
+      maxOutputTokens: 30000,
     });
 
     return result.toTextStreamResponse();
