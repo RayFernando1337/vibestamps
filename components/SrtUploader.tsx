@@ -49,7 +49,7 @@ export function SrtUploader({
       });
 
       if (!validationResult.success) {
-        setError(validationResult.error.errors[0].message);
+        setError(validationResult.error.issues[0].message);
         return;
       }
 
@@ -62,7 +62,7 @@ export function SrtUploader({
       });
 
       if (!contentValidation.success) {
-        setError(contentValidation.error.errors[0].message);
+        setError(contentValidation.error.issues[0].message);
         return;
       }
 

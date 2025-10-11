@@ -27,7 +27,7 @@ export default function Home() {
       // Validate SRT content
       const contentValidation = srtContentSchema.safeParse({ srtContent: content });
       if (!contentValidation.success) {
-        setError(contentValidation.error.errors[0].message);
+        setError(contentValidation.error.issues[0].message);
         return;
       }
 
@@ -60,7 +60,7 @@ export default function Home() {
       // Validate SRT content before sending to API
       const contentValidation = srtContentSchema.safeParse({ srtContent });
       if (!contentValidation.success) {
-        throw new Error(contentValidation.error.errors[0].message);
+        throw new Error(contentValidation.error.issues[0].message);
       }
 
       const response = await fetch("/api/generate", {

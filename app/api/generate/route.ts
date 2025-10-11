@@ -1,54 +1,13 @@
 import { MAX_FILE_SIZE } from "@/lib/constants";
 import { generateApiRequestSchema } from "@/lib/schemas";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { streamText, wrapLanguageModel, type LanguageModelV1Middleware } from "ai";
+import { gateway } from "@ai-sdk/gateway";
+import { streamText } from "ai";
 import { NextResponse } from "next/server";
 
-// Initialize the Google Generative AI provider
-const googleBase = createGoogleGenerativeAI({
-  apiKey: process.env.GOOGLE_API_KEY || "",
-});
-
-// Create a fallback middleware
-const fallbackMiddleware: LanguageModelV1Middleware = {
-  wrapGenerate: async ({ doGenerate, params }) => {
-    try {
-      return await doGenerate();
-    } catch (error) {
-      console.warn("Primary model failed, falling back to gemini-2.5-pro-exp-03-25:", error);
-
-      // Create the fallback model
-      const fallbackModel = googleBase("gemini-2.5-pro-exp-03-25");
-
-      // Call the fallback model with the same parameters
-      return await fallbackModel.doGenerate(params);
-    }
-  },
-
-  wrapStream: async ({ doStream, params }) => {
-    try {
-      return await doStream();
-    } catch (error) {
-      console.warn(
-        "Primary model failed in streaming, falling back to gemini-2.5-pro-exp-03-25:",
-        error
-      );
-
-      // Create the fallback model
-      const fallbackModel = googleBase("gemini-2.5-pro-exp-03-25");
-
-      // Call the fallback model with the same parameters
-      return await fallbackModel.doStream(params);
-    }
-  },
-};
-
-// Create our primary model with fallback middleware
-const primaryModel = googleBase("gemini-1.5-pro");
-const modelWithFallback = wrapLanguageModel({
-  model: primaryModel,
-  middleware: fallbackMiddleware,
-});
+// Initialize the Vercel AI Gateway with Gemini 2.5 Pro
+// When deployed on Vercel, authentication is automatic
+// For local development, set AI_GATEWAY_API_KEY in your .env.local
+const model = gateway("google/gemini-2.5-pro");
 
 export async function POST(request: Request) {
   try {
@@ -68,7 +27,7 @@ export async function POST(request: Request) {
 
     if (!validationResult.success) {
       return NextResponse.json(
-        { error: validationResult.error.errors[0].message },
+        { error: validationResult.error.issues[0].message },
         { status: 400 }
       );
     }
@@ -196,15 +155,15 @@ MM:SS [Action-oriented description]
 ...
     `;
 
-    // Use the model with fallback middleware
-    const { textStream } = streamText({
-      model: modelWithFallback,
+    // Use the AI Gateway model with Gemini 2.5 Pro
+    const result = streamText({
+      model: model,
       prompt: `${systemPrompt}\n\nHere is the transcript content from an SRT file. Please analyze it and generate meaningful timestamps with summaries:\n\n${srtContent}`,
       temperature: 0.1,
-      maxTokens: 1500,
+      maxOutputTokens: 2500,
     });
 
-    return new Response(textStream);
+    return result.toTextStreamResponse();
   } catch (error) {
     console.error("Error processing request:", error);
     return NextResponse.json({ error: "Failed to process request" }, { status: 500 });
