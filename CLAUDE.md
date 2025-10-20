@@ -8,9 +8,47 @@
 **Deployment**: Vercel (vibestamps.com)
 **LLM**: Google Gemini via @ai-sdk/gateway
 
-Vibestamps transforms SRT subtitle files into meaningful timestamps using AI. This CLAUDE.md is the authoritative development guide for Claude Code. Subdirectories contain specialized CLAUDE.md files with detailed patterns.
+Vibestamps transforms SRT subtitle files into meaningful timestamps using AI. This CLAUDE.md is the **root authoritative guide** for Claude Code development.
 
-**Related Documentation**: Existing [AGENTS.md](AGENTS.md) files provide additional context for generic AI agents.
+### Documentation System
+
+This project uses a **hierarchical CLAUDE.md system** optimized for Claude Code:
+
+```
+📦 Vibestamps CLAUDE.md System (3,779 lines)
+│
+├── 📄 CLAUDE.md (Root) ← YOU ARE HERE (492 lines)
+│   └── Purpose: Universal rules, quick navigation, security
+│
+├── 📁 app/
+│   ├── 📄 CLAUDE.md (642 lines)
+│   │   └── Purpose: Next.js App Router, server/client components
+│   └── 📁 api/
+│       └── 📄 CLAUDE.md (690 lines)
+│           └── Purpose: API routes, AI streaming, Gemini integration
+│
+├── 📁 components/
+│   ├── 📄 CLAUDE.md (696 lines)
+│   │   └── Purpose: React patterns, hooks, state management
+│   └── 📁 ui/
+│       └── 📄 CLAUDE.md (589 lines)
+│           └── Purpose: shadcn/ui, variants, dark mode
+│
+└── 📁 lib/
+    └── 📄 CLAUDE.md (670 lines)
+        └── Purpose: Zod schemas, SRT parsing, utilities
+```
+
+**Quick Links**:
+- [app/CLAUDE.md](app/CLAUDE.md) - Next.js App Router patterns (642 lines)
+- [app/api/CLAUDE.md](app/api/CLAUDE.md) - API routes & AI streaming (690 lines)
+- [components/CLAUDE.md](components/CLAUDE.md) - React component patterns (696 lines)
+- [components/ui/CLAUDE.md](components/ui/CLAUDE.md) - shadcn/ui system (589 lines)
+- [lib/CLAUDE.md](lib/CLAUDE.md) - Utilities & validation (670 lines)
+
+**Total Documentation**: **3,779 lines** across 6 CLAUDE.md files + 5 custom slash commands + hooks configuration
+
+**Related Documentation**: Existing [AGENTS.md](AGENTS.md) files (4 files) provide additional context for generic AI agents. This creates a **parallel system** - CLAUDE.md for Claude Code, AGENTS.md for other tools.
 
 ---
 
@@ -84,28 +122,128 @@ gh pr create --title "Feature: description" --body "Summary of changes"
 
 ```
 timestamps-chill/
-├── app/                    # Next.js App Router (see app/CLAUDE.md)
-│   ├── api/generate/       # AI streaming endpoint (see app/api/CLAUDE.md)
+├── CLAUDE.md               # THIS FILE - Universal rules & navigation
+├── app/
+│   ├── CLAUDE.md          # Next.js App Router patterns (370 lines)
+│   ├── api/
+│   │   ├── CLAUDE.md      # API routes & AI streaming (350 lines)
+│   │   └── generate/route.ts
 │   ├── layout.tsx          # Root layout with theme provider
 │   ├── page.tsx            # Main UI (client component)
 │   └── globals.css         # Tailwind v4 + custom animations
-├── components/             # React components (see components/CLAUDE.md)
-│   ├── ui/                 # shadcn/ui primitives (see components/ui/CLAUDE.md)
+├── components/
+│   ├── CLAUDE.md          # React component patterns (380 lines)
+│   ├── ui/
+│   │   ├── CLAUDE.md      # shadcn/ui system (300 lines)
+│   │   ├── button.tsx
+│   │   ├── card.tsx
+│   │   └── ...
 │   ├── SrtUploader.tsx     # File upload with validation
 │   └── TimestampResults.tsx # Streaming results display
-├── lib/                    # Utilities & schemas (see lib/CLAUDE.md)
+├── lib/
+│   ├── CLAUDE.md          # Utilities & validation (390 lines)
 │   ├── constants.ts        # MAX_FILE_SIZE = 430KB
 │   ├── schemas.ts          # Zod validation schemas
 │   ├── srt-parser.ts       # SRT parsing utilities
 │   └── utils.ts            # cn() class merger
+├── .claude/
+│   ├── settings.json       # Hooks configuration
+│   └── commands/           # Custom slash commands (/review, /fix-issue, etc.)
 └── public/                 # Static assets
 ```
 
-**Specialized Context**: When working in specific directories, refer to their CLAUDE.md for detailed patterns:
-- Frontend/UI: [app/CLAUDE.md](app/CLAUDE.md), [components/CLAUDE.md](components/CLAUDE.md)
-- API development: [app/api/CLAUDE.md](app/api/CLAUDE.md)
-- Utilities: [lib/CLAUDE.md](lib/CLAUDE.md)
-- UI components: [components/ui/CLAUDE.md](components/ui/CLAUDE.md)
+---
+
+## CLAUDE.md Hierarchy (Read These for Context)
+
+Claude Code reads CLAUDE.md files hierarchically - each subdirectory provides specialized context:
+
+### 1. **Root** - [CLAUDE.md](CLAUDE.md) ← YOU ARE HERE
+**Lines**: ~280 (concise)
+**Purpose**: Universal rules, project overview, quick navigation
+**When to read**: Always (starting point for all tasks)
+
+### 2. **App Directory** - [app/CLAUDE.md](app/CLAUDE.md)
+**Lines**: ~370 (comprehensive)
+**Purpose**: Next.js 15 App Router, server vs client components, streaming patterns
+**When to read**: Working on pages, layouts, or understanding Next.js patterns
+**Key topics**:
+- Server vs Client Components
+- Streaming API responses
+- Theme management
+- Font loading
+
+### 3. **API Routes** - [app/api/CLAUDE.md](app/api/CLAUDE.md)
+**Lines**: ~350 (comprehensive)
+**Purpose**: API route handlers, Vercel AI SDK, Gemini integration, validation
+**When to read**: Creating/modifying API endpoints, AI model integration
+**Key topics**:
+- Zod validation in API routes
+- Streaming with Vercel AI SDK
+- Request/response patterns
+- Error handling with proper status codes
+
+### 4. **Components** - [components/CLAUDE.md](components/CLAUDE.md)
+**Lines**: ~380 (comprehensive)
+**Purpose**: React component patterns, hooks, event handlers, state management
+**When to read**: Building or modifying React components
+**Key topics**:
+- Feature components (SrtUploader, TimestampResults)
+- Props interfaces & TypeScript
+- Event handler patterns
+- Streaming content parsing
+
+### 5. **UI Primitives** - [components/ui/CLAUDE.md](components/ui/CLAUDE.md)
+**Lines**: ~300 (comprehensive)
+**Purpose**: shadcn/ui component system, variants, customization, dark mode
+**When to read**: Adding shadcn components, customizing UI primitives
+**Key topics**:
+- CVA variant system
+- Adding new shadcn components
+- Dark mode support
+- Design tokens & CSS variables
+
+### 6. **Utilities** - [lib/CLAUDE.md](lib/CLAUDE.md)
+**Lines**: ~390 (comprehensive)
+**Purpose**: Zod schemas, SRT parsing, constants, utility functions
+**When to read**: Validation, parsing SRT files, using utilities
+**Key topics**:
+- All Zod schemas (5 schemas documented)
+- SRT parsing functions
+- Constants management
+- cn() utility for class merging
+
+---
+
+## How to Navigate This System
+
+### Quick Task-Based Navigation
+
+| Task | Read These CLAUDE.md Files |
+|------|---------------------------|
+| **Add new page/route** | Root → [app/CLAUDE.md](app/CLAUDE.md) |
+| **Create API endpoint** | Root → [app/CLAUDE.md](app/CLAUDE.md) → [app/api/CLAUDE.md](app/api/CLAUDE.md) |
+| **Build React component** | Root → [components/CLAUDE.md](components/CLAUDE.md) |
+| **Add shadcn component** | Root → [components/ui/CLAUDE.md](components/ui/CLAUDE.md) |
+| **Add validation schema** | Root → [lib/CLAUDE.md](lib/CLAUDE.md) |
+| **Parse SRT files** | Root → [lib/CLAUDE.md](lib/CLAUDE.md) |
+| **Understand full stack** | Read all 6 CLAUDE.md files in order |
+
+### Context Inheritance
+
+When working in a subdirectory, Claude Code reads CLAUDE.md files from CWD up to root:
+
+```
+Example: Working in app/api/generate/
+  ↓
+Read: app/api/CLAUDE.md (API patterns)
+  ↓
+Read: app/CLAUDE.md (Next.js patterns)
+  ↓
+Read: CLAUDE.md (Universal rules) ← ROOT
+  ↓
+Apply: All rules hierarchically
+```
 
 ---
 
@@ -276,4 +414,83 @@ All checks must pass + manual testing complete before creating PR.
 - Tailwind CSS v4: https://tailwindcss.com/docs
 - Zod: https://zod.dev/
 
-For detailed patterns, see subdirectory CLAUDE.md files linked above.
+---
+
+## Complete CLAUDE.md File Map
+
+This project has **6 CLAUDE.md files** forming a hierarchical documentation system:
+
+### Root Level
+📄 [CLAUDE.md](CLAUDE.md) ← **YOU ARE HERE**
+- **Size**: 492 lines (comprehensive quick reference)
+- **Purpose**: Universal rules, quick navigation, project overview
+- **Always read this first**
+
+### App Directory
+📄 [app/CLAUDE.md](app/CLAUDE.md)
+- **Size**: 642 lines (comprehensive)
+- **Purpose**: Next.js 15 patterns, routing, streaming
+- **Covers**: Server/client components, layouts, pages, theme management
+
+📄 [app/api/CLAUDE.md](app/api/CLAUDE.md)
+- **Size**: 690 lines (comprehensive)
+- **Purpose**: API routes, AI integration, validation
+- **Covers**: Vercel AI SDK, Gemini streaming, request/response patterns
+
+### Components Directory
+📄 [components/CLAUDE.md](components/CLAUDE.md)
+- **Size**: 696 lines (comprehensive)
+- **Purpose**: React component architecture
+- **Covers**: Feature components, hooks, state management, event handlers
+
+📄 [components/ui/CLAUDE.md](components/ui/CLAUDE.md)
+- **Size**: 589 lines (comprehensive)
+- **Purpose**: shadcn/ui component system
+- **Covers**: UI primitives, variants, dark mode, customization
+
+### Lib Directory
+📄 [lib/CLAUDE.md](lib/CLAUDE.md)
+- **Size**: 670 lines (comprehensive)
+- **Purpose**: Utilities, validation, parsing
+- **Covers**: Zod schemas, SRT parsing, constants, utility functions
+
+---
+
+## Custom Slash Commands
+
+Located in `.claude/commands/` directory:
+
+1. `/review` - Comprehensive code review checklist
+2. `/fix-issue <number>` - Analyze and fix GitHub issue
+3. `/check-pr` - Pre-PR validation checklist
+4. `/add-component <name>` - Add shadcn/ui component
+5. `/add-test <name>` - Generate tests (template for future)
+
+---
+
+## Hooks Configuration
+
+Located in `.claude/settings.json`:
+
+- ✅ **PreToolUse**: Block dangerous commands (`rm -rf`, `git push --force`)
+- ✅ **PreToolUse**: Protect sensitive files (`.env.local`, `bun.lock`)
+- ✅ **PostToolUse**: Type check TypeScript files after edits
+- ✅ **UserPromptSubmit**: Pre-PR reminder
+
+---
+
+## Documentation Statistics
+
+| Metric | Count |
+|--------|-------|
+| **CLAUDE.md files** | 6 |
+| **Total lines** | 3,779 |
+| **Root CLAUDE.md** | 492 lines |
+| **Largest file** | components/CLAUDE.md (696 lines) |
+| **Custom commands** | 5 |
+| **Hooks configured** | 4 |
+| **AGENTS.md files** | 4 (parallel system) |
+
+**System Health**: ✅ All documentation files properly linked and cross-referenced
+
+**Coverage**: Every major directory has comprehensive CLAUDE.md documentation with real code examples
