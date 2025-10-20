@@ -1,0 +1,49 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_TOOL_INPUT\" =~ (rm[[:space:]]+-rf|git[[:space:]]+push[[:space:]]+--force|git[[:space:]]+push[[:space:]]+-f) ]]; then echo '❌ BLOCKED: Dangerous command detected. Please use safer alternatives or ask for permission.' && exit 2; fi"
+          },
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_TOOL_INPUT\" =~ (git[[:space:]]+reset[[:space:]]+--hard|git[[:space:]]+clean[[:space:]]+-fd|bun[[:space:]]+remove[[:space:]]+react) ]]; then echo '⚠️  WARNING: Potentially destructive command. Confirm this action is intended.' && exit 2; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_FILE_PATHS\" =~ (\\.env\\.local|bun\\.lock|\\.vercel/) ]]; then echo '🔒 BLOCKED: This file requires explicit permission to edit. Ask the user first.' && exit 2; fi"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_FILE_PATHS\" =~ \\.(ts|tsx)$ ]] && [[ ! \"$CLAUDE_FILE_PATHS\" =~ \\.d\\.ts$ ]]; then echo '🔍 Type checking: '$CLAUDE_FILE_PATHS'' && bunx tsc --noEmit --pretty \"$CLAUDE_FILE_PATHS\" 2>&1 | head -20 || echo '✅ Types OK'; fi"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_USER_PROMPT\" =~ (ready for PR|create PR|open PR|merge) ]]; then echo '📋 Pre-PR Reminder: Run `bunx tsc --noEmit && bun run lint && bun run build` and complete manual testing before creating PR.'; fi"
+          }
+        ]
+      }
+    ]
+  }
+}
