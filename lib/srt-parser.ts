@@ -87,10 +87,10 @@ function timestampToSeconds(timestamp: string): number {
 }
 
 /**
- * Get the duration of the video from SRT content in a human-readable format
- * Returns format like "2 hours and 16 mins" or "45 mins" if under an hour
+ * Get the duration of the video from SRT content in seconds
+ * Returns the maximum end time found in the SRT timestamps
  */
-export function getDurationFromSrtContent(srtContent: string): string {
+export function getDurationInSeconds(srtContent: string): number {
   // Extract all timestamps using the same pattern as the API route
   const timestampRegex = /(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})/g;
   let maxSeconds = 0;
@@ -106,8 +106,15 @@ export function getDurationFromSrtContent(srtContent: string): string {
     }
   }
 
-  // Convert to human-readable format
-  const totalMinutes = Math.floor(maxSeconds / 60);
+  return maxSeconds;
+}
+
+/**
+ * Format duration in seconds to human-readable format
+ * Returns format like "2 hours and 16 mins" or "45 mins" if under an hour
+ */
+export function formatDuration(durationInSeconds: number): string {
+  const totalMinutes = Math.floor(durationInSeconds / 60);
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
 
@@ -122,4 +129,13 @@ export function getDurationFromSrtContent(srtContent: string): string {
   } else {
     return `${minutes} ${minutes === 1 ? "min" : "mins"}`;
   }
+}
+
+/**
+ * Get the duration of the video from SRT content in a human-readable format
+ * Returns format like "2 hours and 16 mins" or "45 mins" if under an hour
+ * @deprecated Use getDurationInSeconds and formatDuration separately for better control
+ */
+export function getDurationFromSrtContent(srtContent: string): string {
+  return formatDuration(getDurationInSeconds(srtContent));
 }

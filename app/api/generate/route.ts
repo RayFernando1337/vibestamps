@@ -1,6 +1,6 @@
 import { MAX_FILE_SIZE } from "@/lib/constants";
 import { generateApiRequestSchema } from "@/lib/schemas";
-import { getDurationFromSrtContent } from "@/lib/srt-parser";
+import { formatDuration, getDurationInSeconds } from "@/lib/srt-parser";
 import { gateway } from "@ai-sdk/gateway";
 import { streamText } from "ai";
 import { NextResponse } from "next/server";
@@ -35,8 +35,14 @@ export async function POST(request: Request) {
 
     const { srtContent } = validationResult.data;
 
-    // Get the duration in a human-readable format (e.g., "2 hours and 16 mins" or "45 mins")
-    const duration = getDurationFromSrtContent(srtContent);
+    // Get the duration in seconds for logic checks
+    const durationInSeconds = getDurationInSeconds(srtContent);
+
+    // Format for display in the prompt
+    const durationFormatted = formatDuration(durationInSeconds);
+
+    // Check if content is over an hour (3600 seconds) to request more timestamps
+    const isLongContent = durationInSeconds >= 3600;
 
     // Create a system prompt that explains what we want from the model
     const systemPrompt = `
@@ -135,7 +141,9 @@ This is the target quality and format for the final output:
 \`\`\`
 </meta prompt 1>
 <user_instructions>
-Generate timestamps for this content using the Generate Timestamps v4 instructions. This content is ${duration} long, so provide an appropriate number of timestamps based on content density (aim for one key moment every 5-10 minutes as a guideline).
+Generate timestamps for this content using the Generate Timestamps v4 instructions. This content is ${durationFormatted} long${
+      isLongContent ? ", so I'm going to need you to give me more timestamps than normal" : ""
+    }. Provide an appropriate number of timestamps based on content density (aim for one key moment every 5-10 minutes as a guideline).
 </user_instructions>
     `;
 
