@@ -148,10 +148,26 @@ Generate timestamps for this content using the Generate Timestamps v4 instructio
     `;
 
     // Use the AI Gateway model with Gemini 2.5 Pro
+    // Configuration matches Google AI Studio settings:
+    // - Temperature: 1 (for more creative/varied outputs)
+    // - Thinking budget: -1 (auto mode - let model decide)
+    // - Max output tokens: 65536
+    // - Top P: 0.95 (default nucleus sampling)
     const result = streamText({
       model: model,
       prompt: systemPrompt,
+      temperature: 1,
       maxOutputTokens: 65536,
+      topP: 0.95,
+      // Google-specific provider options for thinking configuration
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            thinkingBudget: -1, // -1 = auto mode (model decides budget)
+            includeThoughts: false, // Don't include thought summaries in output
+          },
+        },
+      },
     });
 
     return result.toTextStreamResponse();
