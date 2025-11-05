@@ -1,5 +1,6 @@
 import { MAX_FILE_SIZE } from "@/lib/constants";
 import { generateApiRequestSchema } from "@/lib/schemas";
+import { getDurationFromSrtContent } from "@/lib/srt-parser";
 import { gateway } from "@ai-sdk/gateway";
 import { streamText } from "ai";
 import { NextResponse } from "next/server";
@@ -34,46 +35,8 @@ export async function POST(request: Request) {
 
     const { srtContent } = validationResult.data;
 
-    // Extract the last timestamp from the SRT content using a more robust pattern
-    // This looks for SRT timestamp patterns like "00:14:03,251 --> 00:14:03,751"
-    const timestampRegex = /(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})/g;
-    let maxTimestamp = "00:00:00";
-    let match;
-
-    // Find all timestamp pairs and get the latest end time
-    while ((match = timestampRegex.exec(srtContent)) !== null) {
-      const endTime = match[2]; // Second capture group is the end time
-      // Convert to seconds for comparison
-      const endTimeParts = endTime.split(/[,:]/);
-      const endTimeSeconds =
-        parseInt(endTimeParts[0]) * 3600 +
-        parseInt(endTimeParts[1]) * 60 +
-        parseInt(endTimeParts[2]) +
-        parseInt(endTimeParts[3]) / 1000;
-
-      const maxTimeParts = maxTimestamp.split(/[,:]/);
-      const maxTimeSeconds =
-        parseInt(maxTimeParts[0]) * 3600 +
-        parseInt(maxTimeParts[1]) * 60 +
-        parseInt(maxTimeParts[2] || "0") +
-        parseInt(maxTimeParts[3] || "0") / 1000;
-
-      if (endTimeSeconds > maxTimeSeconds) {
-        // Format nicely for display: HH:MM:SS
-        const hours = endTimeParts[0];
-        const minutes = endTimeParts[1];
-        const seconds = endTimeParts[2];
-
-        // Keep only hours if non-zero, otherwise just show MM:SS
-        maxTimestamp = hours !== "00" ? `${hours}:${minutes}:${seconds}` : `${minutes}:${seconds}`;
-      }
-    }
-
-    // Create more explicit constraints about the video end time
-    const videoEndTimeInfo =
-      maxTimestamp !== "00:00:00"
-        ? `The video's maximum duration is ${maxTimestamp}. ANY TIMESTAMP BEYOND ${maxTimestamp} IS INVALID AND MUST NOT BE INCLUDED IN YOUR RESPONSE. Only generate timestamps within the range of 00:00 to ${maxTimestamp}.`
-        : "";
+    // Get the duration in a human-readable format (e.g., "2 hours and 16 mins" or "45 mins")
+    const duration = getDurationFromSrtContent(srtContent);
 
     // Create a system prompt that explains what we want from the model
     const systemPrompt = `
@@ -84,8 +47,6 @@ ${srtContent}
 </file_contents>
 <meta prompt 1 = "Generate Timestamps v4">
 # Timestamp Generation Guidelines v4.0
-
-**IMPORTANT VIDEO LENGTH CONSTRAINT: ${videoEndTimeInfo}**
 
 These instructions are designed to generate a comprehensive, yet scannable, set of timestamps from a video transcript, especially for longer formats like livestreams. The goal is to capture not just major topics, but also specific demonstrations, key insights, and memorable moments that provide maximum value to the viewer.
 
@@ -99,7 +60,7 @@ These instructions are designed to generate a comprehensive, yet scannable, set 
 
 ### Step 1: Initial Analysis
 
-- Determine the total video duration from the final timestamp in the transcript. The video length is ${maxTimestamp}. Do not generate any timestamps beyond ${maxTimestamp} under any circumstances.
+- Determine the total video duration from the final timestamp in the transcript.
 - Quickly read through the transcript to get a high-level sense of the main themes and the overall flow of the session.
 
 ### Step 2: Identify Key Moments
@@ -107,7 +68,7 @@ These instructions are designed to generate a comprehensive, yet scannable, set 
 Scan the transcript for the following types of content. This goes beyond simple topic changes and is the key to creating a rich, useful list.
 
 - **The Hook:** Always create a \`00:00:00\` timestamp that uses the first few impactful words of the video.
-- **Major Topic Shifts:** The most obvious markers, such as moving from a news update to a personal project demo.
+- **Major Topic Shifts:** The most obvious markers, such as moving from a news update (Cursor pricing) to a personal project demo (Ray Transcribes).
 - **Specific Feature Demonstrations:** Pinpoint the exact moment a feature is shown and explained.
     - *Example:* "How to integrate Claude Code into Cursor"
 - **"Pro-Tip" or "Nugget" Segments:** Isolate moments where a specific, non-obvious piece of advice is given that could save a viewer time or trouble.
@@ -174,7 +135,7 @@ This is the target quality and format for the final output:
 \`\`\`
 </meta prompt 1>
 <user_instructions>
-Generate timestamps for this video using the Generate Timestamps v4 instructions. The video is ${maxTimestamp} long, so provide an appropriate number of timestamps based on content density (aim for one key moment every 5-10 minutes as a guideline).
+Generate timestamps for this content using the Generate Timestamps v4 instructions. This content is ${duration} long, so provide an appropriate number of timestamps based on content density (aim for one key moment every 5-10 minutes as a guideline).
 </user_instructions>
     `;
 
@@ -182,7 +143,7 @@ Generate timestamps for this video using the Generate Timestamps v4 instructions
     const result = streamText({
       model: model,
       prompt: systemPrompt,
-      maxOutputTokens: 30000,
+      maxOutputTokens: 65536,
     });
 
     return result.toTextStreamResponse();
