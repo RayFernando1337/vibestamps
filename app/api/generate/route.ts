@@ -1,14 +1,259 @@
 import { MAX_FILE_SIZE } from "@/lib/constants";
-import { generateApiRequestSchema } from "@/lib/schemas";
+import { generateApiRequestSchema, timestampResponseSchema } from "@/lib/schemas";
 import { formatDuration, getDurationInSeconds } from "@/lib/srt-parser";
 import { gateway } from "@ai-sdk/gateway";
-import { streamText } from "ai";
+import { NoObjectGeneratedError, streamObject } from "ai";
 import { NextResponse } from "next/server";
 
 // Initialize the Vercel AI Gateway with Gemini 2.5 Pro
 // When deployed on Vercel, authentication is automatic
 // For local development, set AI_GATEWAY_API_KEY in your .env.local
 const model = gateway("google/gemini-2.5-pro");
+
+// Retry wrapper with exponential backoff
+async function generateTimestampsWithRetry(
+  srtContent: string,
+  durationInSeconds: number,
+  durationFormatted: string,
+  isLongContent: boolean,
+  maxRetries = 3
+) {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      console.log(`Attempt ${attempt + 1} of ${maxRetries} to generate timestamps`);
+
+      // Calculate the end timestamp in HH:MM:SS format for the prompt
+      const hours = Math.floor(durationInSeconds / 3600);
+      const minutes = Math.floor((durationInSeconds % 3600) / 60);
+      const seconds = Math.floor(durationInSeconds % 60);
+      const endTimestamp =
+        hours > 0
+          ? `${hours}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
+          : `${minutes}:${seconds.toString().padStart(2, "0")}`;
+
+      const systemPrompt = `
+<file_contents>
+\`\`\`srt
+${srtContent}
+\`\`\`
+</file_contents>
+<video_metadata>
+Video Duration: ${durationFormatted} (ends at timestamp ${endTimestamp})
+Total Length: ${durationInSeconds} seconds
+</video_metadata>
+<meta prompt 1 = "Generate Timestamps v4">
+# Timestamp Generation Guidelines v4.0
+
+These instructions are designed to generate a comprehensive, yet scannable, set of timestamps from a video transcript, especially for longer formats like livestreams. The goal is to capture not just major topics, but also specific demonstrations, key insights, and memorable moments that provide maximum value to the viewer.
+
+### Core Principles
+
+1. **Content-Density Over Fixed Numbers:** The number of timestamps should reflect the density of the content, not a fixed count. As a general guideline, aim for **one key moment every 5-10 minutes**, but be flexible. A dense 10-minute segment might need two timestamps, while a 15-minute casual chat might only need one.
+2. **Capture Value, Not Just Topics:** The best timestamps point to specific, valuable information. A viewer should be able to look at the list and immediately find a pro-tip, a deep-dive, or a specific answer.
+3. **Be Specific and Action-Oriented:** Descriptions should be concise (3-6 words) and clearly state what is happening. Use action verbs to convey activity and learning.
+
+### Step-by-Step Process
+
+### Step 1: Initial Analysis
+
+- Determine the total video duration from the final timestamp in the transcript.
+- Quickly read through the transcript to get a high-level sense of the main themes and the overall flow of the session.
+
+### Step 2: Identify Key Moments
+
+Scan the transcript for the following types of content. This goes beyond simple topic changes and is the key to creating a rich, useful list.
+
+- **The Hook:** Always create a \`00:00:00\` or \`0:00\` timestamp that uses the first few impactful words of the video.
+- **Major Topic Shifts:** The most obvious markers, such as moving from a news update (Cursor pricing) to a personal project demo (Ray Transcribes).
+- **Specific Feature Demonstrations:** Pinpoint the exact moment a feature is shown and explained.
+    - *Example:* "How to integrate Claude Code into Cursor"
+- **"Pro-Tip" or "Nugget" Segments:** Isolate moments where a specific, non-obvious piece of advice is given that could save a viewer time or trouble.
+    - *Example:* "Pro-tip for Stripe integration (the 'closed-loop' problem)"
+- **Workflow Deep Dives:** Capture segments dedicated to explaining *how* the host accomplishes a complex task from start to finish.
+    - *Example:* "Detailing his advanced Claude Code workflow"
+- **Live Discoveries or "Aha!" Moments:** If the host discovers a new feature or has a moment of realization live on stream, capture it. It adds personality and is often highly engaging.
+    - *Example:* "Discovering the Magic UI Command Palette"
+- **Community & Meta Moments:** Acknowledge significant interactions with the community or milestones reached during the stream.
+    - *Example:* "The MLX transcriber repo hits 420 stars"
+- **Philosophical or "Soapbox" Segments:** If the host takes a moment to share their broader thoughts on a topic, it's a distinct content block worth timestamping.
+    - *Example:* "His birthday 'preach' on AI engineering"
+
+### Step 3: Draft Timestamps and Descriptions
+
+- For each identified moment, note the \`HH:MM:SS\` or \`MM:SS\` where it begins.
+- Write a concise, specific, and action-oriented description (3-6 words).
+    - **Good:** "Explaining the new Cursor pricing tiers"
+    - **Avoid:** "Talks about pricing"
+    - **Good:** "Final walkthrough of Claude Code setup in Cursor"
+    - **Avoid:** "Claude Code"
+- Use parentheses to add clarifying context where needed (e.g., \`(the 'closed-loop' problem)\`).
+
+### Step 4: Format and Review
+
+1. Assemble the final list in chronological order.
+2. Generate a structured JSON object with \`keyMoments\` array containing objects with \`time\` and \`description\` fields.
+3. Read the entire list from top to bottom. Does it tell the story of the video? Is it easy to scan? Ensure the timestamps are accurate and the descriptions are valuable. Adjust wording for clarity and impact.
+
+### Gold Standard Example Format
+
+The output should be a JSON object with this structure:
+{
+  "keyMoments": [
+    {"time": "00:00:00", "description": "Cursor to refund unexpected charges"},
+    {"time": "00:02:11", "description": "Explaining the new Cursor pricing tiers"},
+    {"time": "00:04:38", "description": "How to claim a refund for overages"},
+    {"time": "00:08:20", "description": "Showcasing the Ray Transcribes app"},
+    {"time": "00:10:43", "description": "Recommending Magic UI templates"},
+    {"time": "00:14:40", "description": "How to integrate Claude Code into Cursor"},
+    {"time": "00:18:30", "description": "Discovering the Magic UI Command Palette"},
+    {"time": "00:24:25", "description": "Detailing advanced Claude Code workflow"},
+    {"time": "00:32:40", "description": "Pro-tip for Stripe integration (closed-loop problem)"},
+    {"time": "00:35:20", "description": "Claude Code terminal navigation tips"},
+    {"time": "00:39:35", "description": "The MLX transcriber repo hits 420 stars"},
+    {"time": "00:44:40", "description": "Deep dive into the Claude Code workflow"},
+    {"time": "00:52:56", "description": "Explaining the full development stack"},
+    {"time": "00:59:08", "description": "Final recap of the Cursor pricing changes"},
+    {"time": "1:08:08", "description": "Explaining YouTube memberships and Discord access"},
+    {"time": "1:12:00", "description": "Ray's birthday preach on AI engineering"},
+    {"time": "1:19:50", "description": "Using Claude Code to plan app launch"},
+    {"time": "1:25:36", "description": "Deep dive on the planning mode workflow"},
+    {"time": "1:32:21", "description": "Final walkthrough of Claude Code setup in Cursor"}
+  ]
+}
+</meta prompt 1>
+<user_instructions>
+Generate timestamps for this content using the Generate Timestamps v4 instructions. This content is ${durationFormatted} long${
+        isLongContent ? ", so I'm going to need you to give me more timestamps than normal" : ""
+      }. Provide an appropriate number of timestamps based on content density (aim for one key moment every 5-10 minutes as a guideline).
+
+CRITICAL REQUIREMENTS:
+1. You MUST analyze the ENTIRE transcript from start (00:00:00 or 0:00) to the END (${endTimestamp}).
+2. The video is ${durationFormatted} long - your final timestamp should be close to ${endTimestamp}.
+3. Do NOT stop early at 1:16:15 or any other time before the end.
+4. Generate timestamps that span the COMPLETE duration of the video from beginning to ${endTimestamp}.
+
+IMPORTANT: Return ONLY a valid JSON object matching the structure shown in the Gold Standard Example Format. Use the exact field names "keyMoments", "time", and "description". Ensure all timestamps are in MM:SS or HH:MM:SS format.
+
+Expected JSON structure (timestamps should go all the way to ${endTimestamp}):
+{
+  "keyMoments": [
+    {"time": "00:00:00", "description": "Opening"},
+    {"time": "00:15:30", "description": "Key topic"},
+    ...continue through to approximately ${endTimestamp}...
+    {"time": "${endTimestamp}", "description": "Closing"}
+  ]
+}
+</user_instructions>
+    `;
+
+      const result = streamObject({
+        model: model,
+        schema: timestampResponseSchema,
+        prompt: systemPrompt,
+        temperature: 1,
+        maxOutputTokens: 65536,
+        topP: 0.95,
+        providerOptions: {
+          google: {
+            thinkingConfig: {
+              thinkingBudget: -1,
+              includeThoughts: false,
+            },
+          },
+        },
+        // Handle streaming errors
+        onError({ error }) {
+          console.error(`Stream error on attempt ${attempt + 1}:`, error);
+        },
+        // Validate final object
+        onFinish({ object, error }) {
+          if (error) {
+            console.error(`Validation error on attempt ${attempt + 1}:`, error);
+          } else if (object) {
+            const timestampCount = object.keyMoments?.length || 0;
+            console.log(`✅ Successfully generated ${timestampCount} timestamps`);
+
+            // Log the time range covered
+            if (object.keyMoments && object.keyMoments.length > 0) {
+              const firstTime = object.keyMoments[0].time;
+              const lastTime = object.keyMoments[object.keyMoments.length - 1].time;
+              console.log(
+                `⏱️  Time range: ${firstTime} to ${lastTime} (requested: ${endTimestamp} / ${durationFormatted})`
+              );
+
+              // Parse last timestamp to seconds for comparison
+              const lastTimeParts = lastTime.split(":").map(Number);
+              const lastTimeSeconds =
+                lastTimeParts.length === 3
+                  ? lastTimeParts[0] * 3600 + lastTimeParts[1] * 60 + lastTimeParts[2]
+                  : lastTimeParts[0] * 60 + lastTimeParts[1];
+
+              const timeDifference = durationInSeconds - lastTimeSeconds;
+
+              if (timeDifference > 300) {
+                // More than 5 minutes short
+                console.warn(
+                  `⚠️  WARNING: Last timestamp (${lastTime}) is ${Math.floor(
+                    timeDifference / 60
+                  )} minutes before video end (${endTimestamp})`
+                );
+              }
+            }
+          }
+        },
+        // Attempt to repair malformed JSON
+        experimental_repairText: async ({ text, error }) => {
+          console.log("Attempting to repair malformed JSON:", error.message);
+          // Try to fix common JSON issues
+          let repaired = text.trim();
+
+          // Add missing closing braces if needed
+          const openBraces = (repaired.match(/\{/g) || []).length;
+          const closeBraces = (repaired.match(/\}/g) || []).length;
+          if (openBraces > closeBraces) {
+            repaired += "}".repeat(openBraces - closeBraces);
+          }
+
+          // Add missing closing brackets if needed
+          const openBrackets = (repaired.match(/\[/g) || []).length;
+          const closeBrackets = (repaired.match(/\]/g) || []).length;
+          if (openBrackets > closeBrackets) {
+            repaired += "]".repeat(openBrackets - closeBrackets);
+          }
+
+          console.log("Repaired JSON:", repaired);
+          return repaired;
+        },
+      });
+
+      return result;
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`Attempt ${attempt + 1} failed:`, error);
+
+      // Handle specific error types
+      if (NoObjectGeneratedError.isInstance(error)) {
+        console.error("NoObjectGeneratedError details:", {
+          cause: error.cause,
+          text: error.text?.substring(0, 200), // Log first 200 chars
+          usage: error.usage,
+        });
+      }
+
+      // Don't retry on the last attempt
+      if (attempt < maxRetries - 1) {
+        const delayMs = 1000 * Math.pow(2, attempt); // Exponential backoff: 1s, 2s, 4s
+        console.log(`Waiting ${delayMs}ms before retry...`);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
+  // All retries failed
+  throw lastError || new Error("Failed to generate timestamps after all retries");
+}
 
 export async function POST(request: Request) {
   try {
@@ -37,142 +282,51 @@ export async function POST(request: Request) {
 
     // Get the duration in seconds for logic checks
     const durationInSeconds = getDurationInSeconds(srtContent);
+    console.log(`📹 Video duration detected: ${durationInSeconds} seconds`);
 
     // Format for display in the prompt
     const durationFormatted = formatDuration(durationInSeconds);
+    console.log(`⏱️  Formatted duration: ${durationFormatted}`);
 
     // Check if content is over an hour (3600 seconds) to request more timestamps
     const isLongContent = durationInSeconds >= 3600;
 
-    // Create a system prompt that explains what we want from the model
-    const systemPrompt = `
-<file_contents>
-\`\`\`srt
-${srtContent}
-\`\`\`
-</file_contents>
-<meta prompt 1 = "Generate Timestamps v4">
-# Timestamp Generation Guidelines v4.0
+    // Fallback: if duration detection fails, extract from last SRT entry manually
+    if (durationInSeconds === 0) {
+      console.warn("⚠️  WARNING: Duration detection returned 0! Attempting manual extraction...");
+      // Try to find the last timestamp in the SRT content
+      const lines = srtContent.split("\n");
+      const lastTimestampLine = lines.reverse().find((line) => /\d{2}:\d{2}:\d{2}/.test(line));
+      if (lastTimestampLine) {
+        console.log(`🔍 Last timestamp line found: ${lastTimestampLine}`);
+      }
+    }
 
-These instructions are designed to generate a comprehensive, yet scannable, set of timestamps from a video transcript, especially for longer formats like livestreams. The goal is to capture not just major topics, but also specific demonstrations, key insights, and memorable moments that provide maximum value to the viewer.
+    // Generate timestamps with retry logic
+    const result = await generateTimestampsWithRetry(
+      srtContent,
+      durationInSeconds,
+      durationFormatted,
+      isLongContent,
+      3 // max retries
+    );
 
-### Core Principles
-
-1. **Content-Density Over Fixed Numbers:** The number of timestamps should reflect the density of the content, not a fixed count. As a general guideline, aim for **one key moment every 5-10 minutes**, but be flexible. A dense 10-minute segment might need two timestamps, while a 15-minute casual chat might only need one.
-2. **Capture Value, Not Just Topics:** The best timestamps point to specific, valuable information. A viewer should be able to look at the list and immediately find a pro-tip, a deep-dive, or a specific answer.
-3. **Be Specific and Action-Oriented:** Descriptions should be concise (3-6 words) and clearly state what is happening. Use action verbs to convey activity and learning.
-
-### Step-by-Step Process
-
-### Step 1: Initial Analysis
-
-- Determine the total video duration from the final timestamp in the transcript.
-- Quickly read through the transcript to get a high-level sense of the main themes and the overall flow of the session.
-
-### Step 2: Identify Key Moments
-
-Scan the transcript for the following types of content. This goes beyond simple topic changes and is the key to creating a rich, useful list.
-
-- **The Hook:** Always create a \`00:00:00\` timestamp that uses the first few impactful words of the video.
-- **Major Topic Shifts:** The most obvious markers, such as moving from a news update (Cursor pricing) to a personal project demo (Ray Transcribes).
-- **Specific Feature Demonstrations:** Pinpoint the exact moment a feature is shown and explained.
-    - *Example:* "How to integrate Claude Code into Cursor"
-- **"Pro-Tip" or "Nugget" Segments:** Isolate moments where a specific, non-obvious piece of advice is given that could save a viewer time or trouble.
-    - *Example:* "Pro-tip for Stripe integration (the 'closed-loop' problem)"
-- **Workflow Deep Dives:** Capture segments dedicated to explaining *how* the host accomplishes a complex task from start to finish.
-    - *Example:* "Detailing his advanced Claude Code workflow"
-- **Live Discoveries or "Aha!" Moments:** If the host discovers a new feature or has a moment of realization live on stream, capture it. It adds personality and is often highly engaging.
-    - *Example:* "Discovering the Magic UI Command Palette"
-- **Community & Meta Moments:** Acknowledge significant interactions with the community or milestones reached during the stream.
-    - *Example:* "The MLX transcriber repo hits 420 stars"
-- **Philosophical or "Soapbox" Segments:** If the host takes a moment to share their broader thoughts on a topic, it's a distinct content block worth timestamping.
-    - *Example:* "His birthday 'preach' on AI engineering"
-
-### Step 3: Draft Timestamps and Descriptions
-
-- For each identified moment, note the \`HH:MM:SS\` where it begins.
-- Write a concise, specific, and action-oriented description (3-6 words).
-    - **Good:** "Explaining the new Cursor pricing tiers"
-    - **Avoid:** "Talks about pricing"
-    - **Good:** "Final walkthrough of Claude Code setup in Cursor"
-    - **Avoid:** "Claude Code"
-- Use parentheses to add clarifying context where needed (e.g., \`(the 'closed-loop' problem)\`).
-
-### Step 4: Format and Review
-
-1. Assemble the final list in chronological order.
-2. Use the standard format:
-    
-    \`\`\`markdown
-    🕒 Key moments:
-    00:00:00 [Initial 3-5 word hook]
-    HH:MM:SS [Specific, action-oriented description]
-    HH:MM:SS [Specific, action-oriented description]
-    ...
-    \`\`\`
-    
-3. Read the entire list from top to bottom. Does it tell the story of the video? Is it easy to scan? Ensure the timestamps are accurate and the descriptions are valuable. Adjust wording for clarity and impact.
-
-### Gold Standard Example
-
-This is the target quality and format for the final output:
-
-\`\`\`
-🕒 Key moments:
-00:00:00 Cursor to refund unexpected charges
-00:02:11 Explaining the new Cursor pricing tiers
-00:04:38 How to claim a refund for overages
-00:08:20 Showcasing the "Ray Transcribes" app
-00:10:43 Recommending Magic UI templates
-00:14:40 How to integrate Claude Code into Cursor
-00:18:30 Discovering the Magic UI Command Palette
-00:24:25 Detailing advanced Claude Code workflow
-00:32:40 Pro-tip for Stripe integration (the "closed-loop" problem)
-00:35:20 Claude Code terminal navigation tips
-00:39:35 The MLX transcriber repo hits 420 stars
-00:44:40 Deep dive into the Claude Code workflow
-00:52:56 Explaining the full development stack
-00:59:08 Final recap of the Cursor pricing changes
-1:08:08 Explaining YouTube memberships and Discord access
-1:12:00 Ray's birthday "preach" on AI engineering
-1:19:50 Using Claude Code to plan app launch
-1:25:36 Deep dive on the "planning mode" workflow
-1:32:21 Final walkthrough of Claude Code setup in Cursor
-\`\`\`
-</meta prompt 1>
-<user_instructions>
-Generate timestamps for this content using the Generate Timestamps v4 instructions. This content is ${durationFormatted} long${
-      isLongContent ? ", so I'm going to need you to give me more timestamps than normal" : ""
-    }. Provide an appropriate number of timestamps based on content density (aim for one key moment every 5-10 minutes as a guideline).
-</user_instructions>
-    `;
-
-    // Use the AI Gateway model with Gemini 2.5 Pro
-    // Configuration matches Google AI Studio settings:
-    // - Temperature: 1 (for more creative/varied outputs)
-    // - Thinking budget: -1 (auto mode - let model decide)
-    // - Max output tokens: 65536
-    // - Top P: 0.95 (default nucleus sampling)
-    const result = streamText({
-      model: model,
-      prompt: systemPrompt,
-      temperature: 1,
-      maxOutputTokens: 65536,
-      topP: 0.95,
-      // Google-specific provider options for thinking configuration
-      providerOptions: {
-        google: {
-          thinkingConfig: {
-            thinkingBudget: -1, // -1 = auto mode (model decides budget)
-            includeThoughts: false, // Don't include thought summaries in output
-          },
-        },
-      },
-    });
-
+    // Return the structured stream response
     return result.toTextStreamResponse();
   } catch (error) {
     console.error("Error processing request:", error);
+
+    // Provide more specific error messages
+    if (NoObjectGeneratedError.isInstance(error)) {
+      return NextResponse.json(
+        {
+          error: "Failed to generate valid timestamps. The AI response could not be parsed.",
+          details: error.message,
+        },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json({ error: "Failed to process request" }, { status: 500 });
   }
 }

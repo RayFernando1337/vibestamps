@@ -14,18 +14,22 @@ import { useState } from "react";
 const doto = Doto({ weight: "900", subsets: ["latin"] });
 
 export default function Home() {
-  const [srtContent, setSrtContent] = useState<string>("");
+  const [srtContent, setSrtContent] = useState<string>(""); // Raw SRT with timestamps
   const [srtEntries, setSrtEntries] = useState<SrtEntry[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<string>("");
   const [error, setError] = useState<string>("");
 
   // Handle extracted SRT content
-  const handleContentExtracted = (content: string, entries: SrtEntry[]) => {
+  const handleContentExtracted = (
+    rawContent: string,
+    _extractedText: string,
+    entries: SrtEntry[]
+  ) => {
     // Validate content and entries with Zod
     try {
-      // Validate SRT content
-      const contentValidation = srtContentSchema.safeParse({ srtContent: content });
+      // Validate raw SRT content (should have timestamps)
+      const contentValidation = srtContentSchema.safeParse({ srtContent: rawContent });
       if (!contentValidation.success) {
         setError(contentValidation.error.issues[0].message);
         return;
@@ -38,7 +42,7 @@ export default function Home() {
         return;
       }
 
-      setSrtContent(content);
+      setSrtContent(rawContent); // Store raw SRT with timestamps for API processing
       setSrtEntries(entries);
       setGeneratedContent(""); // Reset previous results
       setError("");
@@ -76,19 +80,43 @@ export default function Home() {
         throw new Error(errorData.error || "Failed to generate timestamps");
       }
 
-      // Handle streaming response
+      // Handle streaming response from streamObject
+      // The response is a text stream containing partial JSON objects
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
-      let result = "";
+      let accumulatedText = "";
 
       if (reader) {
+        console.log("🚀 Starting to receive streaming data...");
+        let chunkCount = 0;
+
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+
+          if (done) {
+            console.log(`✅ Stream complete! Received ${chunkCount} chunks`);
+            console.log(`📊 Final accumulated length: ${accumulatedText.length} characters`);
+            break;
+          }
+
           const chunk = decoder.decode(value, { stream: true });
-          result += chunk;
-          setGeneratedContent(result);
+          accumulatedText += chunk;
+          chunkCount++;
+
+          // Log every 10th chunk to monitor progress
+          if (chunkCount % 10 === 0) {
+            console.log(
+              `📦 Chunk ${chunkCount}: +${chunk.length} chars (total: ${accumulatedText.length})`
+            );
+          }
+
+          // Update state with accumulated text
+          // TimestampResults will parse this as structured data
+          setGeneratedContent(accumulatedText);
         }
+
+        // Log final content for debugging
+        console.log("📝 Final content preview:", accumulatedText.substring(0, 500));
       }
     } catch (err) {
       console.error("Error generating timestamps:", err);

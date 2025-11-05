@@ -95,15 +95,25 @@ export function getDurationInSeconds(srtContent: string): number {
   const timestampRegex = /(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})/g;
   let maxSeconds = 0;
   let match;
+  let matchCount = 0;
 
   // Find the latest end time
   while ((match = timestampRegex.exec(srtContent)) !== null) {
+    matchCount++;
     const endTime = match[2]; // Second capture group is the end time
     const endTimeSeconds = timestampToSeconds(endTime);
 
     if (endTimeSeconds > maxSeconds) {
       maxSeconds = endTimeSeconds;
     }
+  }
+
+  console.log(`🎬 Found ${matchCount} SRT timestamp ranges, max duration: ${maxSeconds} seconds`);
+
+  // If no matches found, log a sample of the content for debugging
+  if (matchCount === 0) {
+    console.error("❌ No SRT timestamps found! Sample content:");
+    console.error(srtContent.substring(0, 500));
   }
 
   return maxSeconds;

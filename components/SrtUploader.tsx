@@ -7,7 +7,7 @@ import { extractTextFromSrt, parseSrtContent, SrtEntry } from "@/lib/srt-parser"
 import { useRef, useState } from "react";
 
 interface SrtUploaderProps {
-  onContentExtracted: (content: string, entries: SrtEntry[]) => void;
+  onContentExtracted: (rawContent: string, extractedText: string, entries: SrtEntry[]) => void;
   onProcessFile: () => void;
   disabled: boolean;
   entriesCount: number;
@@ -74,7 +74,8 @@ export function SrtUploader({
       }
 
       const extractedText = extractTextFromSrt(entries);
-      onContentExtracted(extractedText, entries);
+      // Pass both raw SRT content (with timestamps) and extracted text
+      onContentExtracted(content, extractedText, entries);
 
       // Auto-process after a short delay to allow UI to update
       setTimeout(() => {

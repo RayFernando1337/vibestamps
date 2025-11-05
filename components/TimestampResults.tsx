@@ -2,95 +2,166 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { timestampResponseSchema } from "@/lib/schemas";
 import { useEffect, useRef, useState } from "react";
+import { z } from "zod";
 
 interface TimestampResultsProps {
   isLoading: boolean;
   content: string;
 }
 
+type TimestampItem = z.infer<typeof timestampResponseSchema>["keyMoments"][number];
+
+interface ParsedTimestamp extends TimestampItem {
+  isNew?: boolean;
+}
+
 export function TimestampResults({ isLoading, content }: TimestampResultsProps) {
   const [progress, setProgress] = useState(0);
-  const [parsedSections, setParsedSections] = useState<{ timestamp: string; isNew?: boolean }[]>(
-    []
-  );
+  const [parsedTimestamps, setParsedTimestamps] = useState<ParsedTimestamp[]>([]);
   const prevContentRef = useRef<string>("");
 
-  // Simulate progress when loading
+  // Update progress based on actual streaming content
   useEffect(() => {
     if (isLoading) {
-      const interval = setInterval(() => {
-        setProgress((prev) => {
-          // Keep progress between 0-95% while loading
-          // We'll set it to 100% when loading is complete
-          const newValue = prev + Math.random() * 15;
-          return Math.min(newValue, 95);
-        });
-      }, 200);
+      // Base progress on content length and number of timestamps
+      if (content) {
+        // Parse to see how many timestamps we have so far
+        const currentCount = parsedTimestamps.length;
 
-      return () => {
-        clearInterval(interval);
-      };
+        if (currentCount > 0) {
+          // Estimate progress based on timestamps received
+          // Assume we want roughly 1 timestamp every 5-10 minutes
+          // For a 90 min video, that's ~9-18 timestamps
+          // Use a more conservative estimate to avoid hitting 100% too early
+          const estimatedTotal = Math.max(10, currentCount * 1.5);
+          const calculatedProgress = Math.min(90, (currentCount / estimatedTotal) * 100);
+          setProgress(calculatedProgress);
+        } else {
+          // Show some progress even if we haven't parsed timestamps yet
+          const contentProgress = Math.min(40, content.length / 100);
+          setProgress(contentProgress);
+        }
+      } else {
+        // Initial loading state
+        setProgress(10);
+      }
     } else if (content) {
-      // Set progress to 100% when we have content and loading is complete
+      // Set progress to 100% when loading is complete
       setProgress(100);
+    } else {
+      setProgress(0);
     }
-  }, [isLoading, content]);
+  }, [isLoading, content, parsedTimestamps.length]);
 
-  // Parse timestamp content and handle streaming updates
+  // Parse structured JSON content from streamObject
   useEffect(() => {
-    const parseLines = (text: string) => {
+    const parseStructuredContent = (text: string): TimestampItem[] => {
       if (!text) return [];
 
-      // Split by lines and filter empty lines
-      const lines = text
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean);
+      try {
+        // Try to parse as complete JSON first
+        const parsed = JSON.parse(text);
+        const validated = timestampResponseSchema.safeParse(parsed);
 
-      // Find header line with "Key Moments" (if exists)
-      const contentStartIndex = lines.findIndex(
-        (line) => line === "🕒 Key Moments:" || line === "🕒 Key moments:"
-      );
+        if (validated.success) {
+          return validated.data.keyMoments;
+        }
 
-      // Get only content after the header, or use all lines if header not found
-      const contentLines = contentStartIndex >= 0 ? lines.slice(contentStartIndex + 1) : lines;
+        // If validation fails, return empty array (partial data)
+        return [];
+      } catch {
+        // If JSON parsing fails, it's likely partial streaming data
+        // Try to extract partial keyMoments array
+        try {
+          // Look for keyMoments array in the partial JSON
+          const keyMomentsMatch = text.match(/"keyMoments"\s*:\s*\[([\s\S]*?)(?:\]|$)/);
 
-      // Match lines with timestamp format MM:SS or HH:MM:SS followed by description
-      // Now handles both "00:00 Description" and "00:00:00 Description" formats
-      return contentLines
-        .filter((line) => {
-          // Match either MM:SS or HH:MM:SS format at the start of the line
-          return /^(\d{1,2}:\d{2}(:\d{2})?\s+)/.test(line);
-        })
-        .map((line) => ({ timestamp: line }));
+          if (keyMomentsMatch) {
+            // Try to parse partial array
+            const partialArray = keyMomentsMatch[1];
+            // Add closing bracket if missing
+            const arrayText = partialArray.endsWith("]") ? partialArray : partialArray + "]";
+
+            try {
+              const items = JSON.parse(`[${arrayText}]`);
+              // Validate each item
+              return items.filter((item: unknown) => {
+                const result = z
+                  .object({
+                    time: z.string(),
+                    description: z.string(),
+                  })
+                  .safeParse(item);
+                return result.success;
+              });
+            } catch {
+              // If that fails, try to extract individual complete objects
+              const objectMatches = partialArray.matchAll(
+                /\{[^}]*"time"\s*:\s*"([^"]+)"[^}]*"description"\s*:\s*"([^"]+)"[^}]*\}/g
+              );
+              const extractedItems: TimestampItem[] = [];
+
+              for (const match of objectMatches) {
+                extractedItems.push({
+                  time: match[1],
+                  description: match[2],
+                });
+              }
+
+              return extractedItems;
+            }
+          }
+        } catch (parseError) {
+          console.error("Error parsing partial JSON:", parseError);
+        }
+
+        return [];
+      }
     };
 
     // If there's new content
     if (content !== prevContentRef.current) {
-      const currentLines = parseLines(content);
-      const previousLines = parseLines(prevContentRef.current);
+      const currentTimestamps = parseStructuredContent(content);
+      const previousTimestamps = parseStructuredContent(prevContentRef.current);
 
-      // Find new lines that weren't in the previous content
-      if (currentLines.length > previousLines.length) {
-        const newSections = currentLines.map((line, index) => {
-          // Mark as new if it's a line we haven't seen before
-          const isNew = index >= previousLines.length;
+      // Log parsing progress for debugging
+      if (currentTimestamps.length !== previousTimestamps.length) {
+        console.log(
+          `📊 Parsed ${currentTimestamps.length} timestamps (was ${previousTimestamps.length})`
+        );
+        if (currentTimestamps.length > 0) {
+          const lastTimestamp = currentTimestamps[currentTimestamps.length - 1];
+          console.log(`⏱️  Latest timestamp: ${lastTimestamp.time} - ${lastTimestamp.description}`);
+        }
+      }
+
+      // Find new timestamps that weren't in the previous content
+      if (currentTimestamps.length > previousTimestamps.length) {
+        const newTimestamps = currentTimestamps.map((timestamp, index) => {
+          // Mark as new if it's a timestamp we haven't seen before
+          const isNew = index >= previousTimestamps.length;
           return {
-            ...line,
+            ...timestamp,
             isNew: isNew,
           };
         });
 
-        setParsedSections(newSections);
+        setParsedTimestamps(newTimestamps);
 
         // After a delay, remove the "new" flag to stop the animation
-        if (newSections.some((s) => s.isNew)) {
+        if (newTimestamps.some((t) => t.isNew)) {
           const timer = setTimeout(() => {
-            setParsedSections((prev) => prev.map((section) => ({ ...section, isNew: false })));
+            setParsedTimestamps((prev) =>
+              prev.map((timestamp) => ({ ...timestamp, isNew: false }))
+            );
           }, 1000);
           return () => clearTimeout(timer);
         }
+      } else if (currentTimestamps.length > 0) {
+        // Update with current timestamps even if count is the same (content might have changed)
+        setParsedTimestamps(currentTimestamps);
       }
 
       prevContentRef.current = content;
@@ -99,7 +170,9 @@ export function TimestampResults({ isLoading, content }: TimestampResultsProps) 
 
   // Function to copy all timestamps to clipboard
   const copyToClipboard = () => {
-    const timestampsText = parsedSections.map((section) => section.timestamp).join("\n");
+    const timestampsText = parsedTimestamps
+      .map((item) => `${item.time} ${item.description}`)
+      .join("\n");
     navigator.clipboard.writeText(timestampsText);
   };
 
@@ -144,34 +217,27 @@ export function TimestampResults({ isLoading, content }: TimestampResultsProps) 
         </div>
 
         {/* Now we show results even while loading if we have some content */}
-        {parsedSections.length > 0 ? (
+        {parsedTimestamps.length > 0 ? (
           <div className="animate-in fade-in duration-500">
-            {content.includes("🕒 Key Moments:") || content.includes("🕒 Key moments:") ? (
-              <div className="mb-4 text-center">
-                <p className="text-sky-700 dark:text-sky-300 text-lg font-medium">🕒 Key Moments</p>
-              </div>
-            ) : null}
+            <div className="mb-4 text-center">
+              <p className="text-sky-700 dark:text-sky-300 text-lg font-medium">🕒 Key Moments</p>
+            </div>
 
             <div className="space-y-2 mt-2">
-              {parsedSections.map((section, index) => {
-                // Extract time part and description part from the timestamp
-                // Handles both "00:00 Description" and "00:00:00 Description" formats
-                const [timePart, ...descriptionParts] = section.timestamp.split(/\s+/);
-                const description = descriptionParts.join(" ");
-
+              {parsedTimestamps.map((timestamp, index) => {
                 return (
                   <div
-                    key={index}
+                    key={`${timestamp.time}-${index}`}
                     className={`border-b border-slate-200/60 dark:border-slate-700/50 py-3 last:border-0 flex items-start justify-between group hover:bg-emerald-50/50 dark:hover:bg-emerald-900/20 rounded-xl px-4 transition-colors ${
-                      section.isNew
+                      timestamp.isNew
                         ? "animate-in slide-in-from-right-5 fade-in duration-300 scale-in-100"
                         : ""
                     }`}
                     style={
-                      section.isNew
+                      timestamp.isNew
                         ? {
                             animationDelay: `${index * 100}ms`,
-                            backgroundColor: section.isNew
+                            backgroundColor: timestamp.isNew
                               ? "rgba(16,185,129,0.07)"
                               : "transparent",
                             transition: "background-color 1s ease-out",
@@ -182,10 +248,10 @@ export function TimestampResults({ isLoading, content }: TimestampResultsProps) 
                     <div className="flex-1">
                       <div className="flex items-baseline">
                         <span className="text-base font-medium text-emerald-600 dark:text-emerald-400 mr-3 whitespace-nowrap">
-                          {timePart}
+                          {timestamp.time}
                         </span>
                         <span className="text-base text-slate-700 dark:text-slate-200">
-                          {description}
+                          {timestamp.description}
                         </span>
                       </div>
                     </div>
@@ -196,7 +262,11 @@ export function TimestampResults({ isLoading, content }: TimestampResultsProps) 
                             variant="ghost"
                             size="sm"
                             className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full ml-2"
-                            onClick={() => navigator.clipboard.writeText(section.timestamp)}
+                            onClick={() =>
+                              navigator.clipboard.writeText(
+                                `${timestamp.time} ${timestamp.description}`
+                              )
+                            }
                           >
                             <span className="sr-only">Copy</span>
                             <svg
