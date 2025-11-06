@@ -114,7 +114,7 @@ export function SrtUploader({
     <Card
       className={
         isDragging
-          ? "w-full max-w-2xl p-4 transition-all duration-300 border-2 border-info/[--opacity-surface] bg-info/10 shadow-glow-info"
+          ? "w-full max-w-2xl p-4 transition-all duration-300 border-2 border-info/80 bg-info/10 shadow-glow-info"
           : "w-full max-w-2xl p-4 transition-all duration-300 hover:border-info/20 hover:shadow-md"
       }
       onDragOver={handleDragOver}

@@ -5,16 +5,16 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-medium transition-all duration-300 disabled:pointer-events-none disabled:opacity-[--opacity-disabled] [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/[--opacity-subtle] focus-visible:ring-[3px] aria-invalid:ring-error/20 aria-invalid:border-error",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-medium transition-all duration-300 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-error/20 aria-invalid:border-error",
   {
     variants: {
       variant: {
         default:
-          "bg-brand/[--opacity-hover] text-brand-foreground shadow-md hover:bg-brand-hover/[--opacity-hover] hover:shadow-glow-brand",
+          "bg-brand/90 text-white shadow-md hover:bg-brand-hover/90 hover:shadow-glow-brand",
         destructive:
-          "bg-error/[--opacity-hover] text-brand-foreground shadow-md hover:bg-error-hover/[--opacity-hover] hover:shadow-glow-brand focus-visible:ring-error/20",
+          "bg-error/90 text-white shadow-md hover:bg-error-hover/90 hover:shadow-glow-brand focus-visible:ring-error/20",
         outline:
-          "border border-border/[--opacity-surface] bg-surface backdrop-blur-sm shadow-md hover:bg-info/10 hover:text-info hover:border-info",
+          "border border-border/80 bg-surface backdrop-blur-sm shadow-md hover:bg-info/10 hover:text-info hover:border-info",
         secondary:
           "bg-info/10 text-info shadow-md hover:bg-info/20 hover:shadow-glow-info",
         ghost:

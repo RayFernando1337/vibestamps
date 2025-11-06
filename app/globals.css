@@ -100,7 +100,7 @@
   /* Base System Colors */
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
+  --card: oklch(1 0 0 / 0.8);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
@@ -175,7 +175,7 @@
   /* Base System Colors */
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --card: oklch(0.205 0 0 / 0.8);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
@@ -206,13 +206,13 @@
   --sidebar-ring: oklch(0.556 0 0);
 
   /* Semantic Color Palette - Dark Mode */
-  --brand: oklch(0.7 0.14 160);           /* emerald-400 equivalent */
-  --brand-hover: oklch(0.75 0.15 160);    /* emerald-300 equivalent */
-  --brand-foreground: oklch(0.145 0 0);   /* dark background */
+  --brand: oklch(0.65 0.15 160);          /* emerald-500 equivalent (darker for better contrast) */
+  --brand-hover: oklch(0.7 0.15 160);     /* emerald-400 equivalent */
+  --brand-foreground: oklch(1 0 0);       /* white (consistent in both modes) */
   
-  --info: oklch(0.65 0.11 230);           /* sky-400 equivalent */
-  --info-hover: oklch(0.7 0.12 230);      /* sky-300 equivalent */
-  --info-foreground: oklch(0.145 0 0);    /* dark background */
+  --info: oklch(0.6 0.12 230);            /* sky-500 equivalent (darker for better contrast) */
+  --info-hover: oklch(0.65 0.12 230);     /* sky-400 equivalent */
+  --info-foreground: oklch(1 0 0);        /* white (consistent in both modes) */
   
   --success: oklch(0.7 0.14 160);         /* emerald-400 (same as brand) */
   --success-hover: oklch(0.75 0.15 160);  /* emerald-300 */
@@ -222,8 +222,8 @@
   --error: oklch(0.704 0.191 22.216);     /* rose-400 (using destructive) */
   --error-hover: oklch(0.75 0.2 22);      /* rose-300 equivalent */
   
-  --surface: oklch(0.205 0 0 / 0.8);      /* slate-900/80 */
-  --surface-hover: oklch(0.269 0 0 / 0.8); /* slate-800/80 */
+  --surface: oklch(0.205 0 0 / 0.85);      /* slate-900/85 (slightly more opaque) */
+  --surface-hover: oklch(0.269 0 0 / 0.85); /* slate-800/85 */
   
   --neutral: oklch(0.6 0 0);              /* slate-400 equivalent */
   --neutral-hover: oklch(0.7 0 0);        /* slate-300 equivalent */

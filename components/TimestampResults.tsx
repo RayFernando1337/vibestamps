@@ -300,7 +300,7 @@ export function TimestampResults({ isLoading, content, entriesCount }: Timestamp
           </p>
           <Progress value={progress} className="h-2" />
           <div className="flex justify-center">
-            <div className="animate-pulse text-description/[--opacity-subtle] text-sm mt-2">
+            <div className="animate-pulse text-description/50 text-sm mt-2">
               This may take a moment depending on file size
             </div>
           </div>

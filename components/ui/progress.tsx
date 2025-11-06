@@ -21,7 +21,7 @@ function Progress({
     >
       <ProgressPrimitive.Indicator
         data-slot="progress-indicator"
-        className="bg-brand/[--opacity-hover] h-full w-full flex-1 transition-all duration-300 rounded-full shadow-glow-brand"
+        className="bg-brand h-full w-full flex-1 transition-all duration-300 rounded-full shadow-glow-brand"
         style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
       />
     </ProgressPrimitive.Root>
