@@ -9,6 +9,7 @@ import { z } from "zod";
 interface TimestampResultsProps {
   isLoading: boolean;
   content: string;
+  entriesCount: number;
 }
 
 type TimestampItem = z.infer<typeof timestampResponseSchema>["keyMoments"][number];
@@ -17,43 +18,132 @@ interface ParsedTimestamp extends TimestampItem {
   isNew?: boolean;
 }
 
-export function TimestampResults({ isLoading, content }: TimestampResultsProps) {
+// RAY-7: Easing function for smooth progress animation
+// Starts fast, slows down near end for natural feel
+const easeOutCubic = (t: number): number => {
+  return 1 - Math.pow(1 - t, 3);
+};
+
+// RAY-7: Duration estimation based on file characteristics
+// Formula derived from timing analysis in RAY-6
+function estimateDuration(entriesCount: number): number {
+  // Based on 2 data points (RAY-5):
+  // - Average: 12.2ms per entry
+  // - Range: 10.0ms (fast) to 14.6ms (slow)
+  // Using 13ms as conservative middle ground
+  // Note: fileSize showed high correlation with entriesCount, so we use entriesCount as primary factor
+
+  const BASE_TIME = 10000; // 10 seconds base API processing
+  const MS_PER_ENTRY = 13; // 13ms per entry (slightly conservative)
+
+  const estimated = BASE_TIME + entriesCount * MS_PER_ENTRY;
+
+  return Math.max(18000, estimated); // Minimum 18 seconds
+}
+
+export function TimestampResults({ isLoading, content, entriesCount }: TimestampResultsProps) {
   const [progress, setProgress] = useState(0);
   const [parsedTimestamps, setParsedTimestamps] = useState<ParsedTimestamp[]>([]);
   const prevContentRef = useRef<string>("");
 
-  // Update progress based on actual streaming content
+  // PHASE 1: Timing instrumentation
+  const streamStartTimeRef = useRef<number>(0);
+  const firstContentTimeRef = useRef<number>(0);
+  const timestampTimingsRef = useRef<Array<{ time: number; count: number }>>([]);
+  const estimatedDurationRef = useRef<number>(0);
+
+  // RAY-7: Smooth progress animation with easeOutCubic
   useEffect(() => {
     if (isLoading) {
-      // Base progress on content length and number of timestamps
-      if (content) {
-        // Parse to see how many timestamps we have so far
-        const currentCount = parsedTimestamps.length;
-
-        if (currentCount > 0) {
-          // Estimate progress based on timestamps received
-          // Assume we want roughly 1 timestamp every 5-10 minutes
-          // For a 90 min video, that's ~9-18 timestamps
-          // Use a more conservative estimate to avoid hitting 100% too early
-          const estimatedTotal = Math.max(10, currentCount * 1.5);
-          const calculatedProgress = Math.min(90, (currentCount / estimatedTotal) * 100);
-          setProgress(calculatedProgress);
-        } else {
-          // Show some progress even if we haven't parsed timestamps yet
-          const contentProgress = Math.min(40, content.length / 100);
-          setProgress(contentProgress);
-        }
-      } else {
-        // Initial loading state
-        setProgress(10);
+      // Initialize timing and estimate duration on first load
+      if (!streamStartTimeRef.current) {
+        streamStartTimeRef.current = Date.now();
+        estimatedDurationRef.current = estimateDuration(entriesCount);
+        console.log("⏱️  Progress bar timing started");
+        console.log(
+          `📊 Estimated duration: ${estimatedDurationRef.current}ms (${(
+            estimatedDurationRef.current / 1000
+          ).toFixed(1)}s)`
+        );
       }
+
+      // Record first content arrival
+      if (content && !firstContentTimeRef.current) {
+        firstContentTimeRef.current = Date.now();
+        const ttfc = firstContentTimeRef.current - streamStartTimeRef.current;
+        console.log(`📥 Time to First Content (TTFC): ${ttfc}ms`);
+      }
+
+      // Record timestamp arrival timing (for debugging/metrics)
+      const currentCount = parsedTimestamps.length;
+      const elapsed = Date.now() - streamStartTimeRef.current;
+      if (currentCount > 0 && timestampTimingsRef.current.length < 50) {
+        const lastRecorded = timestampTimingsRef.current[timestampTimingsRef.current.length - 1];
+        if (!lastRecorded || lastRecorded.count !== currentCount) {
+          timestampTimingsRef.current.push({ time: elapsed, count: currentCount });
+          console.log(
+            `📊 Timestamp #${currentCount} arrived at ${elapsed}ms (${(
+              currentCount /
+              (elapsed / 1000)
+            ).toFixed(2)} timestamps/sec)`
+          );
+        }
+      }
+
+      // Simple interval-based progress updates - let CSS handle the smoothness
+      // Update every 500ms, shadcn Progress component will animate between states
+      const progressInterval = setInterval(() => {
+        const elapsed = Date.now() - streamStartTimeRef.current;
+        const estimated = estimatedDurationRef.current;
+
+        // Calculate raw progress (0 to 1)
+        const rawProgress = Math.min(elapsed / estimated, 1);
+
+        // Apply easeOutCubic for smooth deceleration
+        const easedProgress = easeOutCubic(rawProgress);
+
+        // Cap at 95% until loading completes
+        const displayProgress = Math.min(easedProgress * 100, 95);
+
+        setProgress(displayProgress);
+      }, 500); // Update every 500ms - CSS transition handles the smooth animation
+
+      // Cleanup interval on unmount or when loading completes
+      return () => clearInterval(progressInterval);
     } else if (content) {
-      // Set progress to 100% when loading is complete
+      // Loading complete - jump to 100%
+      const totalDuration = Date.now() - streamStartTimeRef.current;
+
+      // Log final timing summary
+      if (streamStartTimeRef.current) {
+        console.log("🎯 PROGRESS BAR TIMING COMPLETE:", {
+          totalDuration: `${totalDuration}ms (${(totalDuration / 1000).toFixed(2)}s)`,
+          estimatedDuration: `${estimatedDurationRef.current}ms (${(
+            estimatedDurationRef.current / 1000
+          ).toFixed(2)}s)`,
+          accuracy: `${((totalDuration / estimatedDurationRef.current) * 100).toFixed(
+            1
+          )}% of estimate`,
+          timestampCount: parsedTimestamps.length,
+          timestampTimings: timestampTimingsRef.current,
+          averageTimePerTimestamp:
+            parsedTimestamps.length > 0
+              ? `${Math.round(totalDuration / parsedTimestamps.length)}ms`
+              : "N/A",
+        });
+
+        // Reset for next run
+        streamStartTimeRef.current = 0;
+        firstContentTimeRef.current = 0;
+        timestampTimingsRef.current = [];
+        estimatedDurationRef.current = 0;
+      }
+
       setProgress(100);
     } else {
       setProgress(0);
     }
-  }, [isLoading, content, parsedTimestamps.length]);
+  }, [isLoading, content, parsedTimestamps.length, entriesCount]);
 
   // Parse structured JSON content from streamObject
   useEffect(() => {

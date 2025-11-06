@@ -60,12 +60,33 @@ export default function Home() {
     setError("");
     setGeneratedContent("");
 
+    // RAY-5: Timing instrumentation for Phase 1
+    const timingMetrics = {
+      requestStart: Date.now(),
+      firstByteTime: 0,
+      firstChunkTime: 0,
+      completionTime: 0,
+      totalChunks: 0,
+      totalBytes: 0,
+      fileSize: srtContent.length,
+      entriesCount: srtEntries.length,
+      chunkTimings: [] as Array<{ chunkIndex: number; timestamp: number; size: number }>,
+    };
+
     try {
       // Validate SRT content before sending to API
       const contentValidation = srtContentSchema.safeParse({ srtContent });
       if (!contentValidation.success) {
         throw new Error(contentValidation.error.issues[0].message);
       }
+
+      console.log("📊 [RAY-5] TIMING INSTRUMENTATION START:", {
+        fileSize: `${timingMetrics.fileSize} bytes (${(timingMetrics.fileSize / 1024).toFixed(
+          2
+        )} KB)`,
+        entriesCount: timingMetrics.entriesCount,
+        timestamp: new Date().toISOString(),
+      });
 
       const response = await fetch("/api/generate", {
         method: "POST",
@@ -93,20 +114,97 @@ export default function Home() {
         while (true) {
           const { done, value } = await reader.read();
 
+          // Record first byte time (TTFB)
+          if (chunkCount === 0 && !timingMetrics.firstByteTime) {
+            timingMetrics.firstByteTime = Date.now();
+            const ttfb = timingMetrics.firstByteTime - timingMetrics.requestStart;
+            console.log(`⚡ [RAY-5] Time to First Byte (TTFB): ${ttfb}ms`);
+          }
+
           if (done) {
-            console.log(`✅ Stream complete! Received ${chunkCount} chunks`);
-            console.log(`📊 Final accumulated length: ${accumulatedText.length} characters`);
+            timingMetrics.completionTime = Date.now();
+            const totalDuration = timingMetrics.completionTime - timingMetrics.requestStart;
+            const streamingDuration = timingMetrics.completionTime - timingMetrics.firstByteTime;
+
+            console.log("✅ Stream complete! Received", chunkCount, "chunks");
+            console.log("📊 [RAY-5] TIMING SUMMARY:", {
+              // Overall timing
+              totalDuration: `${totalDuration}ms (${(totalDuration / 1000).toFixed(2)}s)`,
+              ttfb: `${timingMetrics.firstByteTime - timingMetrics.requestStart}ms`,
+              streamingDuration: `${streamingDuration}ms (${(streamingDuration / 1000).toFixed(
+                2
+              )}s)`,
+
+              // Data metrics
+              totalBytes: timingMetrics.totalBytes,
+              chunkCount: chunkCount,
+              avgChunkSize: `${Math.round(timingMetrics.totalBytes / chunkCount)} bytes`,
+
+              // Throughput metrics
+              bytesPerSecond: Math.round(timingMetrics.totalBytes / (streamingDuration / 1000)),
+              charsPerSecond: Math.round(timingMetrics.totalBytes / (streamingDuration / 1000)),
+
+              // Input characteristics
+              inputFileSize: `${timingMetrics.fileSize} bytes`,
+              inputEntriesCount: timingMetrics.entriesCount,
+
+              // Estimated token metrics (rough: 1 token ≈ 4 chars)
+              estimatedInputTokens: Math.round(timingMetrics.fileSize / 4),
+              estimatedOutputTokens: Math.round(timingMetrics.totalBytes / 4),
+              estimatedTokensPerSecond: Math.round(
+                timingMetrics.totalBytes / 4 / (streamingDuration / 1000)
+              ),
+
+              // For Phase 2 analysis
+              durationPerEntry: `${(totalDuration / timingMetrics.entriesCount).toFixed(2)}ms`,
+              durationPer1000Bytes: `${((totalDuration / timingMetrics.fileSize) * 1000).toFixed(
+                2
+              )}ms`,
+            });
+
+            console.log(
+              "📈 [RAY-5] COPY THIS FOR ANALYSIS:",
+              JSON.stringify({
+                entriesCount: timingMetrics.entriesCount,
+                fileSize: timingMetrics.fileSize,
+                totalDuration,
+                ttfb: timingMetrics.firstByteTime - timingMetrics.requestStart,
+                streamingDuration,
+              })
+            );
             break;
           }
 
           const chunk = decoder.decode(value, { stream: true });
           accumulatedText += chunk;
           chunkCount++;
+          timingMetrics.totalChunks = chunkCount;
+          timingMetrics.totalBytes += chunk.length;
+
+          // Record first chunk time
+          if (chunkCount === 1) {
+            timingMetrics.firstChunkTime = Date.now();
+            console.log(
+              `📦 First chunk received at ${
+                timingMetrics.firstChunkTime - timingMetrics.requestStart
+              }ms`
+            );
+          }
+
+          // Record chunk timings for detailed analysis (first 20 chunks)
+          if (chunkCount <= 20) {
+            timingMetrics.chunkTimings.push({
+              chunkIndex: chunkCount,
+              timestamp: Date.now() - timingMetrics.requestStart,
+              size: chunk.length,
+            });
+          }
 
           // Log every 10th chunk to monitor progress
           if (chunkCount % 10 === 0) {
+            const elapsed = Date.now() - timingMetrics.requestStart;
             console.log(
-              `📦 Chunk ${chunkCount}: +${chunk.length} chars (total: ${accumulatedText.length})`
+              `📦 Chunk ${chunkCount}: +${chunk.length} chars (total: ${accumulatedText.length}, elapsed: ${elapsed}ms)`
             );
           }
 
@@ -116,7 +214,7 @@ export default function Home() {
         }
 
         // Log final content for debugging
-        console.log("📝 Final content preview:", accumulatedText.substring(0, 500));
+        console.log("📝 Final content length:", accumulatedText.length, "characters");
       }
     } catch (err) {
       console.error("Error generating timestamps:", err);
@@ -273,7 +371,11 @@ export default function Home() {
           {/* Step 2 & 3: Processing or Results */}
           {(isProcessing || generatedContent) && (
             <div className="w-full flex flex-col items-center animate-in fade-in duration-300">
-              <TimestampResults isLoading={isProcessing} content={generatedContent} />
+              <TimestampResults
+                isLoading={isProcessing}
+                content={generatedContent}
+                entriesCount={srtEntries.length}
+              />
 
               {/* Only show reset button when results are generated and not loading */}
               {generatedContent && !isProcessing && (
