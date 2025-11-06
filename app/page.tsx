@@ -265,10 +265,10 @@ export default function Home() {
               Vibestamps
             </div>
           </div>
-          <p className="text-center text-gray-600 dark:text-gray-400 max-w-2xl px-16 md:px-0">
+          <p className="text-center text-muted-foreground max-w-2xl px-16 md:px-0">
             Upload a .srt file to generate meaningful timestamps for YouTube videos.
           </p>
-          <p className="text-center text-gray-600 dark:text-gray-400 max-w-2xl px-16 md:px-0 flex items-center justify-center gap-2 py-2">
+          <p className="text-center text-muted-foreground max-w-2xl px-16 md:px-0 flex items-center justify-center gap-2 py-2">
             Ray Fernando
             <a
               href="https://rfer.me/xprofilevshedr"
@@ -340,7 +340,7 @@ export default function Home() {
 
           {/* Error Display (show at any step if there's an error) */}
           {error && (
-            <div className="w-full max-w-2xl p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-3 animate-in fade-in duration-300">
+            <div className="w-full max-w-2xl p-4 bg-error/10 border border-error/20 rounded-lg flex items-start gap-3 animate-in fade-in duration-300">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="20"
@@ -351,13 +351,13 @@ export default function Home() {
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="text-red-500 mt-0.5"
+                className="text-error mt-0.5"
               >
                 <circle cx="12" cy="12" r="10" />
                 <line x1="12" y1="8" x2="12" y2="12" />
                 <line x1="12" y1="16" x2="12.01" y2="16" />
               </svg>
-              <div className="text-red-600 dark:text-red-400 text-sm">
+              <div className="text-error text-sm">
                 <p className="font-medium">Error</p>
                 <p>{error}</p>
                 {/* Add a retry button when there's an error */}
@@ -396,7 +396,7 @@ export default function Home() {
         </main>
 
         {/* Footer */}
-        <footer className="mt-auto pt-8 pb-8 text-gray-500 dark:text-gray-400 text-sm flex flex-col">
+        <footer className="mt-auto pt-8 pb-8 text-muted-foreground text-sm flex flex-col">
           <div className="flex items-center justify-between w-full">
             {/* Gemini attribution */}
             <div className="opacity-70 hover:opacity-100 transition-opacity">

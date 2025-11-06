@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { MAX_FILE_SIZE } from "@/lib/constants";
 import { srtFileSchema } from "@/lib/schemas";
@@ -115,8 +114,8 @@ export function SrtUploader({
     <Card
       className={
         isDragging
-          ? "w-full max-w-2xl p-4 transition-all duration-300 border-2 border-sky-400/80 dark:border-sky-500/70 bg-sky-50/80 dark:bg-sky-900/20 shadow-[0_8px_30px_rgba(14,165,233,0.2)]"
-          : "w-full max-w-2xl p-4 transition-all duration-300 hover:border-sky-200/70 dark:hover:border-sky-700/60 hover:shadow-[0_8px_20px_rgba(0,0,0,0.08)]"
+          ? "w-full max-w-2xl p-4 transition-all duration-300 border-2 border-info/[--opacity-surface] bg-info/10 shadow-glow-info"
+          : "w-full max-w-2xl p-4 transition-all duration-300 hover:border-info/20 hover:shadow-md"
       }
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -126,15 +125,15 @@ export function SrtUploader({
         {!hasContent && (
           <>
             <div className="text-center mb-2">
-              <h2 className="text-xl font-semibold mb-3 text-emerald-800 dark:text-emerald-300">
+              <h2 className="text-xl font-semibold mb-3 text-brand">
                 Upload SRT File
               </h2>
-              <p className="text-sky-700/70 dark:text-sky-300/70 text-sm">
+              <p className="text-description/70 text-sm">
                 Drag & drop your .srt file here or click to browse
               </p>
             </div>
 
-            <Input
+            <input
               ref={fileInputRef}
               type="file"
               accept=".srt"
@@ -171,7 +170,7 @@ export function SrtUploader({
         )}
 
         {fileName && (
-          <div className="mt-2 text-sm flex items-center justify-center gap-2 bg-emerald-50/80 dark:bg-emerald-900/20 p-3 rounded-xl w-full backdrop-blur-sm border border-emerald-100 dark:border-emerald-800/50">
+          <div className="mt-2 text-sm flex items-center justify-center gap-2 bg-brand/10 p-3 rounded-xl w-full backdrop-blur-sm border border-brand/20">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="16"
@@ -182,19 +181,19 @@ export function SrtUploader({
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="text-emerald-500 flex-shrink-0"
+              className="text-brand flex-shrink-0"
             >
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            <span className="font-medium text-emerald-700 dark:text-emerald-300 flex-shrink-0">
+            <span className="font-medium text-brand flex-shrink-0">
               Selected file:
             </span>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="text-slate-600 dark:text-slate-300 truncate max-w-md cursor-help">
+                  <span className="text-neutral truncate max-w-md cursor-help">
                     {fileName}
                   </span>
                 </TooltipTrigger>
@@ -208,7 +207,7 @@ export function SrtUploader({
 
         {hasContent && !disabled && (
           <div className="flex flex-col items-center gap-3 animate-in fade-in duration-300 w-full">
-            <p className="text-sm text-sky-600 dark:text-sky-400 bg-sky-50/50 dark:bg-sky-900/20 px-4 py-2 rounded-full border border-sky-100/70 dark:border-sky-800/50">
+            <p className="text-sm text-description bg-info/10 px-4 py-2 rounded-full border border-info/20">
               <span className="font-medium">{entriesCount}</span> entries found in the SRT file
             </p>
             <Button
@@ -238,7 +237,7 @@ export function SrtUploader({
         )}
 
         {error && (
-          <div className="mt-2 text-sm flex items-start gap-2 bg-rose-50/70 dark:bg-rose-900/20 p-3 rounded-xl border border-rose-200 dark:border-rose-800/60 w-full backdrop-blur-sm">
+          <div className="mt-2 text-sm flex items-start gap-2 bg-error/10 p-3 rounded-xl border border-error/20 w-full backdrop-blur-sm">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="16"
@@ -249,13 +248,13 @@ export function SrtUploader({
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="text-rose-500 mt-0.5"
+              className="text-error mt-0.5"
             >
               <circle cx="12" cy="12" r="10" />
               <line x1="12" y1="8" x2="12" y2="12" />
               <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
-            <span className="text-rose-600 dark:text-rose-300">{error}</span>
+            <span className="text-error">{error}</span>
           </div>
         )}
       </CardContent>

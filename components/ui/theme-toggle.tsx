@@ -22,7 +22,7 @@ export function ThemeToggle() {
       variant="ghost"
       size="icon"
       onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-      className="rounded-full w-10 h-10 bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm shadow-[0_4px_12px_rgba(0,0,0,0.05)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.2)] hover:shadow-[0_6px_16px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_6px_16px_rgba(0,0,0,0.3)] border border-slate-200/50 dark:border-slate-700/50 transition-all duration-300"
+      className="rounded-full w-10 h-10 bg-surface/[--opacity-surface] backdrop-blur-sm shadow-md hover:shadow-lg border border-border/[--opacity-subtle] transition-all duration-300"
       aria-label="Toggle theme"
     >
       {/* Sun (light mode) */}

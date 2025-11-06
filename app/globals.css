@@ -4,6 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* Base System Colors */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
@@ -37,14 +38,66 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+
+  /* Semantic Color System - Brand & Interactive */
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-info: var(--info);
+  --color-info-hover: var(--info-hover);
+  --color-info-foreground: var(--info-foreground);
+  --color-success: var(--success);
+  --color-success-hover: var(--success-hover);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-error-hover: var(--error-hover);
+
+  /* Semantic - Specific Use Cases */
+  --color-timestamp: var(--brand);
+  --color-timestamp-hover: var(--brand-hover);
+  --color-description: var(--info);
+  --color-description-hover: var(--info-hover);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-neutral: var(--neutral);
+  --color-neutral-hover: var(--neutral-hover);
+
+  /* Border Radius */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* Shadow System - Elevation */
+  --shadow-xs: var(--shadow-elevation-xs);
+  --shadow-sm: var(--shadow-elevation-sm);
+  --shadow-md: var(--shadow-elevation-md);
+  --shadow-lg: var(--shadow-elevation-lg);
+  --shadow-xl: var(--shadow-elevation-xl);
+  
+  /* Shadow System - Interactive States */
+  --shadow-focus: var(--shadow-focus-ring);
+  --shadow-focus-brand: var(--shadow-focus-brand-ring);
+  --shadow-focus-error: var(--shadow-focus-error-ring);
+  
+  /* Shadow System - Special Effects */
+  --shadow-glow-brand: var(--shadow-glow-brand-effect);
+  --shadow-glow-info: var(--shadow-glow-info-effect);
+  --shadow-inset-sm: var(--shadow-inset-subtle);
+  --shadow-inset-md: var(--shadow-inset-medium);
+
+  /* Opacity System */
+  --opacity-surface: 0.8;
+  --opacity-backdrop: 0.9;
+  --opacity-disabled: 0.5;
+  --opacity-hover: 0.9;
+  --opacity-subtle: 0.5;
 }
 
 :root {
   --radius: 0.625rem;
+  
+  /* Base System Colors */
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -76,9 +129,50 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* Semantic Color Palette - Light Mode */
+  --brand: oklch(0.6 0.15 160);           /* emerald-600 equivalent */
+  --brand-hover: oklch(0.55 0.16 160);    /* emerald-700 equivalent */
+  --brand-foreground: oklch(1 0 0);       /* white */
+  
+  --info: oklch(0.6 0.12 230);            /* sky-600 equivalent */
+  --info-hover: oklch(0.55 0.13 230);     /* sky-700 equivalent */
+  --info-foreground: oklch(1 0 0);        /* white */
+  
+  --success: oklch(0.6 0.15 160);         /* emerald-600 (same as brand) */
+  --success-hover: oklch(0.55 0.16 160);  /* emerald-700 */
+  
+  --warning: oklch(0.75 0.15 85);         /* amber-500 equivalent */
+  
+  --error: oklch(0.577 0.245 27.325);     /* rose-600 (using destructive) */
+  --error-hover: oklch(0.55 0.25 27);     /* rose-700 equivalent */
+  
+  --surface: oklch(1 0 0 / 0.8);          /* white/80 */
+  --surface-hover: oklch(0.97 0 0 / 0.8); /* slate-50/80 */
+  
+  --neutral: oklch(0.6 0 0);              /* slate-600 equivalent */
+  --neutral-hover: oklch(0.5 0 0);        /* slate-700 equivalent */
+
+  /* Shadow System - Light Mode */
+  --shadow-elevation-xs: 0 1px 3px rgba(0, 0, 0, 0.02);
+  --shadow-elevation-sm: 0 2px 10px rgba(0, 0, 0, 0.03);
+  --shadow-elevation-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-elevation-lg: 0 8px 30px rgba(0, 0, 0, 0.12);
+  --shadow-elevation-xl: 0 12px 40px rgba(0, 0, 0, 0.15);
+  
+  --shadow-focus-ring: 0 0 0 3px rgba(14, 165, 233, 0.15);
+  --shadow-focus-brand-ring: 0 4px 15px rgba(14, 165, 233, 0.15);
+  --shadow-focus-error-ring: 0 0 0 3px rgba(225, 29, 72, 0.15);
+  
+  --shadow-glow-brand-effect: 0 0 8px rgba(16, 185, 129, 0.3);
+  --shadow-glow-info-effect: 0 6px 15px rgba(14, 165, 233, 0.15);
+  
+  --shadow-inset-subtle: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-inset-medium: inset 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .dark {
+  /* Base System Colors */
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -110,6 +204,46 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* Semantic Color Palette - Dark Mode */
+  --brand: oklch(0.7 0.14 160);           /* emerald-400 equivalent */
+  --brand-hover: oklch(0.75 0.15 160);    /* emerald-300 equivalent */
+  --brand-foreground: oklch(0.145 0 0);   /* dark background */
+  
+  --info: oklch(0.65 0.11 230);           /* sky-400 equivalent */
+  --info-hover: oklch(0.7 0.12 230);      /* sky-300 equivalent */
+  --info-foreground: oklch(0.145 0 0);    /* dark background */
+  
+  --success: oklch(0.7 0.14 160);         /* emerald-400 (same as brand) */
+  --success-hover: oklch(0.75 0.15 160);  /* emerald-300 */
+  
+  --warning: oklch(0.8 0.14 85);          /* amber-400 equivalent */
+  
+  --error: oklch(0.704 0.191 22.216);     /* rose-400 (using destructive) */
+  --error-hover: oklch(0.75 0.2 22);      /* rose-300 equivalent */
+  
+  --surface: oklch(0.205 0 0 / 0.8);      /* slate-900/80 */
+  --surface-hover: oklch(0.269 0 0 / 0.8); /* slate-800/80 */
+  
+  --neutral: oklch(0.6 0 0);              /* slate-400 equivalent */
+  --neutral-hover: oklch(0.7 0 0);        /* slate-300 equivalent */
+
+  /* Shadow System - Dark Mode */
+  --shadow-elevation-xs: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --shadow-elevation-sm: 0 2px 10px rgba(0, 0, 0, 0.08);
+  --shadow-elevation-md: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --shadow-elevation-lg: 0 8px 30px rgba(0, 0, 0, 0.25);
+  --shadow-elevation-xl: 0 12px 40px rgba(0, 0, 0, 0.3);
+  
+  --shadow-focus-ring: 0 0 0 3px rgba(14, 165, 233, 0.3);
+  --shadow-focus-brand-ring: 0 4px 15px rgba(14, 165, 233, 0.15);
+  --shadow-focus-error-ring: 0 0 0 3px rgba(225, 29, 72, 0.3);
+  
+  --shadow-glow-brand-effect: 0 0 8px rgba(16, 185, 129, 0.2);
+  --shadow-glow-info-effect: 0 6px 15px rgba(14, 165, 233, 0.15);
+  
+  --shadow-inset-subtle: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+  --shadow-inset-medium: inset 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 @layer base {

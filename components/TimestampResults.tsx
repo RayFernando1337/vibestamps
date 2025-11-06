@@ -269,7 +269,7 @@ export function TimestampResults({ isLoading, content, entriesCount }: Timestamp
   return (
     <Card className="w-full max-w-3xl backdrop-blur-sm">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-xl text-emerald-800 dark:text-emerald-300">
+        <CardTitle className="text-xl text-brand">
           Generated Timestamps
         </CardTitle>
         {content && !isLoading && (
@@ -295,12 +295,12 @@ export function TimestampResults({ isLoading, content, entriesCount }: Timestamp
       </CardHeader>
       <CardContent>
         <div className={isLoading ? "space-y-4 p-6" : "hidden"}>
-          <p className="text-sm text-sky-700/70 dark:text-sky-300/70 text-center">
+          <p className="text-sm text-description/70 text-center">
             Analyzing your SRT file and generating timestamps...
           </p>
           <Progress value={progress} className="h-2" />
           <div className="flex justify-center">
-            <div className="animate-pulse text-sky-600/50 dark:text-sky-400/50 text-sm mt-2">
+            <div className="animate-pulse text-description/[--opacity-subtle] text-sm mt-2">
               This may take a moment depending on file size
             </div>
           </div>
@@ -310,7 +310,7 @@ export function TimestampResults({ isLoading, content, entriesCount }: Timestamp
         {parsedTimestamps.length > 0 ? (
           <div className="animate-in fade-in duration-500">
             <div className="mb-4 text-center">
-              <p className="text-sky-700 dark:text-sky-300 text-lg font-medium">🕒 Key Moments</p>
+              <p className="text-description text-lg font-medium">🕒 Key Moments</p>
             </div>
 
             <div className="space-y-2 mt-2">
@@ -318,7 +318,7 @@ export function TimestampResults({ isLoading, content, entriesCount }: Timestamp
                 return (
                   <div
                     key={`${timestamp.time}-${index}`}
-                    className={`border-b border-slate-200/60 dark:border-slate-700/50 py-3 last:border-0 flex items-start justify-between group hover:bg-emerald-50/50 dark:hover:bg-emerald-900/20 rounded-xl px-4 transition-colors ${
+                    className={`border-b border-border/60 py-3 last:border-0 flex items-start justify-between group hover:bg-brand/10 rounded-xl px-4 transition-colors ${
                       timestamp.isNew
                         ? "animate-in slide-in-from-right-5 fade-in duration-300 scale-in-100"
                         : ""
@@ -337,10 +337,10 @@ export function TimestampResults({ isLoading, content, entriesCount }: Timestamp
                   >
                     <div className="flex-1">
                       <div className="flex items-baseline">
-                        <span className="text-base font-medium text-emerald-600 dark:text-emerald-400 mr-3 whitespace-nowrap">
+                        <span className="text-base font-medium text-timestamp mr-3 whitespace-nowrap">
                           {timestamp.time}
                         </span>
-                        <span className="text-base text-slate-700 dark:text-slate-200">
+                        <span className="text-base text-foreground">
                           {timestamp.description}
                         </span>
                       </div>
@@ -369,7 +369,7 @@ export function TimestampResults({ isLoading, content, entriesCount }: Timestamp
                               strokeWidth="2"
                               strokeLinecap="round"
                               strokeLinejoin="round"
-                              className="text-emerald-600 dark:text-emerald-400"
+                              className="text-timestamp"
                             >
                               <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
                               <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
@@ -390,7 +390,7 @@ export function TimestampResults({ isLoading, content, entriesCount }: Timestamp
           !isLoading &&
           !content && (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="rounded-full bg-emerald-50/80 dark:bg-emerald-900/20 p-6 mb-6 border border-emerald-100/50 dark:border-emerald-800/40">
+              <div className="rounded-full bg-brand/10 p-6 mb-6 border border-brand/20">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="24"
@@ -401,7 +401,7 @@ export function TimestampResults({ isLoading, content, entriesCount }: Timestamp
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="text-emerald-500 dark:text-emerald-400"
+                  className="text-brand"
                 >
                   <path d="M12 2v4" />
                   <path d="M12 18v4" />
@@ -413,7 +413,7 @@ export function TimestampResults({ isLoading, content, entriesCount }: Timestamp
                   <path d="m16.24 7.76 2.83-2.83" />
                 </svg>
               </div>
-              <p className="text-sky-700 dark:text-sky-300">
+              <p className="text-description">
                 Upload an SRT file to generate timestamps
               </p>
             </div>
