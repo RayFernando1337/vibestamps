@@ -10,6 +10,77 @@ import { NextResponse } from "next/server";
 // For local development, set AI_GATEWAY_API_KEY in your .env.local
 const model = gateway("google/gemini-2.5-pro");
 
+/**
+ * Normalize timestamp format based on video duration (YouTube standard)
+ * For videos under 1 hour: MM:SS with leading zeros (00:00, 01:23, 15:30)
+ * For videos over 1 hour: HH:MM:SS with leading zeros (00:00:00, 00:01:23, 02:23:02)
+ */
+function normalizeTimestampFormat(timestamp: string, isLongContent: boolean): string {
+  // Parse the timestamp
+  const parts = timestamp.split(":");
+
+  if (parts.length === 3) {
+    // HH:MM:SS format
+    const hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+    const seconds = parseInt(parts[2], 10);
+
+    if (!isLongContent && hours === 0) {
+      // Video is under 1 hour and timestamp has hours - convert to MM:SS
+      return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+    }
+
+    // For long content, ensure proper HH:MM:SS format with leading zeros
+    if (isLongContent) {
+      return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds
+        .toString()
+        .padStart(2, "0")}`;
+    }
+  } else if (parts.length === 2) {
+    // MM:SS format
+    const minutes = parseInt(parts[0], 10);
+    const seconds = parseInt(parts[1], 10);
+
+    if (isLongContent) {
+      // Video is over 1 hour but timestamp is in MM:SS - convert to HH:MM:SS
+      return `00:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+    }
+
+    // For short content, ensure MM:SS format with leading zeros
+    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+  }
+
+  return timestamp;
+}
+
+/**
+ * Normalize all timestamps in the response based on video duration
+ */
+function normalizeTimestampResponse(
+  response: { keyMoments: Array<{ time: string; description: string }> },
+  isLongContent: boolean
+): { keyMoments: Array<{ time: string; description: string }> } {
+  const normalized = {
+    ...response,
+    keyMoments: response.keyMoments.map((moment) => ({
+      ...moment,
+      time: normalizeTimestampFormat(moment.time, isLongContent),
+    })),
+  };
+
+  // Log normalization for debugging
+  const changedCount = response.keyMoments.filter(
+    (moment, index) => moment.time !== normalized.keyMoments[index].time
+  ).length;
+
+  if (changedCount > 0) {
+    console.log(`📝 Normalized ${changedCount} timestamps for format consistency`);
+    console.log(`   Format: ${isLongContent ? "HH:MM:SS (video >1hr)" : "MM:SS (video <1hr)"}`);
+  }
+
+  return normalized;
+}
+
 // Retry wrapper with exponential backoff
 async function generateTimestampsWithRetry(
   srtContent: string,
@@ -32,6 +103,51 @@ async function generateTimestampsWithRetry(
         hours > 0
           ? `${hours}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
           : `${minutes}:${seconds.toString().padStart(2, "0")}`;
+
+      // Determine format example based on video duration
+      const formatExample = isLongContent
+        ? "01:08:08 (HH:MM:SS with leading zeros)"
+        : "08:20 (MM:SS with leading zeros)";
+
+      // Generate appropriate example timestamps based on video duration
+      const goldStandardExample = isLongContent
+        ? `{
+  "keyMoments": [
+    {"time": "00:00:00", "description": "Cursor to refund unexpected charges"},
+    {"time": "00:02:11", "description": "Explaining the new Cursor pricing tiers"},
+    {"time": "00:04:38", "description": "How to claim a refund for overages"},
+    {"time": "00:08:20", "description": "Showcasing the Ray Transcribes app"},
+    {"time": "00:10:43", "description": "Recommending Magic UI templates"},
+    {"time": "00:14:40", "description": "How to integrate Claude Code into Cursor"},
+    {"time": "00:18:30", "description": "Discovering the Magic UI Command Palette"},
+    {"time": "00:24:25", "description": "Detailing advanced Claude Code workflow"},
+    {"time": "00:32:40", "description": "Pro-tip for Stripe integration (closed-loop problem)"},
+    {"time": "00:35:20", "description": "Claude Code terminal navigation tips"},
+    {"time": "00:39:35", "description": "The MLX transcriber repo hits 420 stars"},
+    {"time": "00:44:40", "description": "Deep dive into the Claude Code workflow"},
+    {"time": "00:52:56", "description": "Explaining the full development stack"},
+    {"time": "00:59:08", "description": "Final recap of the Cursor pricing changes"},
+    {"time": "01:08:08", "description": "Explaining YouTube memberships and Discord access"},
+    {"time": "01:12:00", "description": "Ray's birthday preach on AI engineering"},
+    {"time": "01:19:50", "description": "Using Claude Code to plan app launch"},
+    {"time": "01:25:36", "description": "Deep dive on the planning mode workflow"},
+    {"time": "01:32:21", "description": "Final walkthrough of Claude Code setup in Cursor"}
+  ]
+}`
+        : `{
+  "keyMoments": [
+    {"time": "00:00", "description": "Introduction to the topic"},
+    {"time": "02:15", "description": "Explaining key concepts"},
+    {"time": "05:30", "description": "Live demonstration begins"},
+    {"time": "08:45", "description": "Common pitfalls to avoid"},
+    {"time": "12:20", "description": "Pro-tip for implementation"},
+    {"time": "15:40", "description": "Q&A and community feedback"},
+    {"time": "18:30", "description": "Advanced techniques walkthrough"},
+    {"time": "22:15", "description": "Real-world example"},
+    {"time": "25:50", "description": "Troubleshooting common issues"},
+    {"time": "28:30", "description": "Final thoughts and recap"}
+  ]
+}`;
 
       const systemPrompt = `
 <file_contents>
@@ -65,7 +181,9 @@ These instructions are designed to generate a comprehensive, yet scannable, set 
 
 Scan the transcript for the following types of content. This goes beyond simple topic changes and is the key to creating a rich, useful list.
 
-- **The Hook:** Always create a \`00:00:00\` or \`0:00\` timestamp that uses the first few impactful words of the video.
+- **The Hook:** Always create a \`${
+        isLongContent ? "00:00:00" : "00:00"
+      }\` timestamp that uses the first few impactful words of the video.
 - **Major Topic Shifts:** The most obvious markers, such as moving from a news update (Cursor pricing) to a personal project demo (Ray Transcribes).
 - **Specific Feature Demonstrations:** Pinpoint the exact moment a feature is shown and explained.
     - *Example:* "How to integrate Claude Code into Cursor"
@@ -82,7 +200,7 @@ Scan the transcript for the following types of content. This goes beyond simple 
 
 ### Step 3: Draft Timestamps and Descriptions
 
-- For each identified moment, note the \`HH:MM:SS\` or \`MM:SS\` where it begins.
+- For each identified moment, note the timestamp where it begins.
 - Write a concise, specific, and action-oriented description (3-6 words).
     - **Good:** "Explaining the new Cursor pricing tiers"
     - **Avoid:** "Talks about pricing"
@@ -99,29 +217,7 @@ Scan the transcript for the following types of content. This goes beyond simple 
 ### Gold Standard Example Format
 
 The output should be a JSON object with this structure:
-{
-  "keyMoments": [
-    {"time": "00:00:00", "description": "Cursor to refund unexpected charges"},
-    {"time": "00:02:11", "description": "Explaining the new Cursor pricing tiers"},
-    {"time": "00:04:38", "description": "How to claim a refund for overages"},
-    {"time": "00:08:20", "description": "Showcasing the Ray Transcribes app"},
-    {"time": "00:10:43", "description": "Recommending Magic UI templates"},
-    {"time": "00:14:40", "description": "How to integrate Claude Code into Cursor"},
-    {"time": "00:18:30", "description": "Discovering the Magic UI Command Palette"},
-    {"time": "00:24:25", "description": "Detailing advanced Claude Code workflow"},
-    {"time": "00:32:40", "description": "Pro-tip for Stripe integration (closed-loop problem)"},
-    {"time": "00:35:20", "description": "Claude Code terminal navigation tips"},
-    {"time": "00:39:35", "description": "The MLX transcriber repo hits 420 stars"},
-    {"time": "00:44:40", "description": "Deep dive into the Claude Code workflow"},
-    {"time": "00:52:56", "description": "Explaining the full development stack"},
-    {"time": "00:59:08", "description": "Final recap of the Cursor pricing changes"},
-    {"time": "1:08:08", "description": "Explaining YouTube memberships and Discord access"},
-    {"time": "1:12:00", "description": "Ray's birthday preach on AI engineering"},
-    {"time": "1:19:50", "description": "Using Claude Code to plan app launch"},
-    {"time": "1:25:36", "description": "Deep dive on the planning mode workflow"},
-    {"time": "1:32:21", "description": "Final walkthrough of Claude Code setup in Cursor"}
-  ]
-}
+${goldStandardExample}
 </meta prompt 1>
 <user_instructions>
 Generate timestamps for this content using the Generate Timestamps v4 instructions. This content is ${durationFormatted} long${
@@ -129,18 +225,34 @@ Generate timestamps for this content using the Generate Timestamps v4 instructio
       }. Provide an appropriate number of timestamps based on content density (aim for one key moment every 5-10 minutes as a guideline).
 
 CRITICAL REQUIREMENTS:
-1. You MUST analyze the ENTIRE transcript from start (00:00:00 or 0:00) to the END (${endTimestamp}).
+1. You MUST analyze the ENTIRE transcript from start (${
+        isLongContent ? "00:00:00" : "00:00"
+      }) to the END (${endTimestamp}).
 2. The video is ${durationFormatted} long - your final timestamp should be close to ${endTimestamp}.
-3. Do NOT stop early at 1:16:15 or any other time before the end.
-4. Generate timestamps that span the COMPLETE duration of the video from beginning to ${endTimestamp}.
+3. Do NOT stop early - generate timestamps that span the COMPLETE duration from beginning to ${endTimestamp}.
+4. ALL timestamps must use the ${isLongContent ? "HH:MM:SS" : "MM:SS"} format with leading zeros.
 
-IMPORTANT: Return ONLY a valid JSON object matching the structure shown in the Gold Standard Example Format. Use the exact field names "keyMoments", "time", and "description". Ensure all timestamps are in MM:SS or HH:MM:SS format.
+TIMESTAMP FORMAT REQUIREMENT (CRITICAL - YouTube Standard):
+- Video duration: ${durationFormatted} (${durationInSeconds} seconds)
+- ${
+        isLongContent
+          ? "This video is OVER 1 HOUR long. You MUST use HH:MM:SS format with LEADING ZEROS for ALL timestamps (e.g., 00:00:00, 00:15:30, 01:08:08)."
+          : "This video is UNDER 1 HOUR long. You MUST use MM:SS format with LEADING ZEROS for ALL timestamps (e.g., 00:00, 08:20, 15:30). DO NOT use HH:MM:SS format."
+      }
+- Format example: ${formatExample}
+- ALWAYS include leading zeros (e.g., "08:20" NOT "8:20", "01:08:08" NOT "1:08:08")
+
+IMPORTANT: Return ONLY a valid JSON object matching the structure shown in the Gold Standard Example Format above. Use the exact field names "keyMoments", "time", and "description". ${
+        isLongContent
+          ? "Use HH:MM:SS format with leading zeros for ALL timestamps."
+          : "Use MM:SS format with leading zeros for ALL timestamps - DO NOT include hours."
+      }
 
 Expected JSON structure (timestamps should go all the way to ${endTimestamp}):
 {
   "keyMoments": [
-    {"time": "00:00:00", "description": "Opening"},
-    {"time": "00:15:30", "description": "Key topic"},
+    {"time": "${isLongContent ? "00:00:00" : "00:00"}", "description": "Opening"},
+    {"time": "${isLongContent ? "00:15:30" : "15:30"}", "description": "Key topic"},
     ...continue through to approximately ${endTimestamp}...
     {"time": "${endTimestamp}", "description": "Closing"}
   ]
@@ -167,11 +279,17 @@ Expected JSON structure (timestamps should go all the way to ${endTimestamp}):
         onError({ error }) {
           console.error(`Stream error on attempt ${attempt + 1}:`, error);
         },
-        // Validate final object
+        // Validate final object and normalize timestamps
         onFinish({ object, error }) {
           if (error) {
             console.error(`Validation error on attempt ${attempt + 1}:`, error);
           } else if (object) {
+            // Normalize timestamp format based on video duration
+            const normalizedObject = normalizeTimestampResponse(object, isLongContent);
+
+            // Update the object with normalized timestamps
+            object.keyMoments = normalizedObject.keyMoments;
+
             const timestampCount = object.keyMoments?.length || 0;
             console.log(`✅ Successfully generated ${timestampCount} timestamps`);
 
