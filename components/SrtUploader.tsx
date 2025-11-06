@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { MAX_FILE_SIZE } from "@/lib/constants";
 import { srtFileSchema } from "@/lib/schemas";
 import { extractTextFromSrt, parseSrtContent, SrtEntry } from "@/lib/srt-parser";
@@ -181,16 +182,27 @@ export function SrtUploader({
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="text-emerald-500"
+              className="text-emerald-500 flex-shrink-0"
             >
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            <span className="font-medium text-emerald-700 dark:text-emerald-300">
+            <span className="font-medium text-emerald-700 dark:text-emerald-300 flex-shrink-0">
               Selected file:
             </span>
-            <span className="text-slate-600 dark:text-slate-300">{fileName}</span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-slate-600 dark:text-slate-300 truncate max-w-md cursor-help">
+                    {fileName}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-sm break-all">
+                  <p>{fileName}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         )}
 
